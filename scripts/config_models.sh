@@ -96,7 +96,7 @@ MODEL_SELECT() {
         nemotron-h-8b)
             MODEL_PATH="${MODEL_DIR}/nemotron_h_8b"
             MODEL_TEMPLATE_TYPE="base"
-            MODEL_FRAMEWORK="vllm"
+            MODEL_FRAMEWORK="hf"
             ;;
     esac
 
