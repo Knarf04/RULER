@@ -181,7 +181,7 @@ def generate_input_output(num_haystack, needle_depth):
             
         # indexes = sorted(random.sample(range(num_haystack), len(needles)), reverse=True)
         depth_percent_interval = (100 - needle_depth) / len(needles)
-        insertion_positions = [int(num_haystack * ((needle_depth + i * depth_percent_interval) / 100)) for i in range(needles-1, -1, -1)]
+        insertion_positions = [int(num_haystack * (1 - (needle_depth + i * depth_percent_interval) / 100)) for i in range(len(needles))]
         
         for index, element in zip(insertion_positions, needles):
             sentences.insert(index, element)
