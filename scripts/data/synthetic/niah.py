@@ -100,7 +100,7 @@ words = sorted(list(set(words)))
 
 
 # Positions
-DEPTHS = list(np.round(np.linspace(0, 100, num=40, endpoint=True)).astype(int))
+# DEPTHS = list(np.round(np.linspace(0, 100, num=40, endpoint=True)).astype(int))
 
 
 def generate_random_number(num_digits=7):
@@ -125,7 +125,7 @@ def generate_random(type_needle: str):
     else:
         raise NotImplementedError(f'{args.type_needle} is not implemented.')
 
-def generate_input_output(num_haystack):
+def generate_input_output(num_haystack, needle_depth):
     keys, values, needles = [], [], []
     for _ in range(args.num_needle_k):
         keys.append(generate_random(args.type_needle_k))
@@ -143,7 +143,6 @@ def generate_input_output(num_haystack):
     
     # Context
     if args.type_haystack == 'essay':
-        text = " ".join(haystack[:num_haystack])
         if num_haystack <= len(haystack):
             text = " ".join(haystack[:num_haystack])
         else:
@@ -151,9 +150,15 @@ def generate_input_output(num_haystack):
             repeats = (num_haystack + len(haystack) - 1) // len(haystack)  # Ceiling division
             text = " ".join((haystack * repeats)[:num_haystack])
         document_sents = sent_tokenize(text.strip())
+        # Modify multi-needle depth following: https://github.com/gkamradt/LLMTest_NeedleInAHaystack
+        # This inserts the first needle at the specified depth_percent, then evenly distributes subsequent needles through the remaining context after this depth.
+        depth_percent_interval = (100 - needle_depth) / len(needles)
         insertion_positions = [0] + \
-                              sorted([int(len(document_sents) * (depth / 100)) for depth in random.sample(DEPTHS, len(needles))]) + \
-                              [len(document_sents)]
+                            [int(len(document_sents) * ((needle_depth + i * depth_percent_interval) / 100)) for i in range(len(needles))] + \
+                            [len(document_sents)]
+        # insertion_positions = [0] + \
+        #                     sorted([int(len(document_sents) * (depth / 100)) for depth in random.sample(DEPTHS, len(needles))]) + \
+        #                     [len(document_sents)]
         document_sents_list = []
         for i in range(1,len(insertion_positions)):
             last_pos = insertion_positions[i-1]
@@ -174,8 +179,11 @@ def generate_input_output(num_haystack):
             ) for _ in range(num_haystack)]
 
             
-        indexes = sorted(random.sample(range(num_haystack), len(needles)), reverse=True)
-        for index, element in zip(indexes, needles):
+        # indexes = sorted(random.sample(range(num_haystack), len(needles)), reverse=True)
+        depth_percent_interval = (100 - needle_depth) / len(needles)
+        insertion_positions = [int(num_haystack * ((needle_depth + i * depth_percent_interval) / 100)) for i in range(needles-1, -1, -1)]
+        
+        for index, element in zip(insertion_positions, needles):
             sentences.insert(index, element)
         context = "\n".join(sentences)
 
@@ -225,7 +233,7 @@ def generate_samples(num_samples: int, max_seq_length: int, save_dir: str, incre
         
     total_tokens = 0  # Track the total tokens generated for the first example
     while total_tokens + tokens_to_generate < max_seq_length :  
-        input_text, answer = generate_input_output(num_haystack)
+        input_text, answer = generate_input_output(num_haystack, 0)
         # Calculate the number of tokens in the example
         total_tokens = len(TOKENIZER.text_to_tokens(input_text + ' '.join(answer)))
         logger.info(f'Max length {max_seq_length} | Current length {total_tokens + tokens_to_generate} | Haystack: {num_haystack}')
@@ -242,10 +250,12 @@ def generate_samples(num_samples: int, max_seq_length: int, save_dir: str, incre
     
     # Generate samples
     for index in tqdm(range(num_samples)):
+        # Compute depth using index
+        needle_depth = int(index / num_samples * 100)
         used_haystack = num_haystack
         while(True):
             try:
-                input_text, answer  = generate_input_output(used_haystack)
+                input_text, answer  = generate_input_output(used_haystack, needle_depth)
                 length = len(TOKENIZER.text_to_tokens(input_text)) + tokens_to_generate
                 assert length <= max_seq_length, f"{length} exceeds max_seq_length."
                 break
