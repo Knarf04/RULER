@@ -1,4 +1,4 @@
-nemo_toolkit['all']==2.1.0
+# nemo_toolkit['all']==2.1.0
 tritonclient[all]
 transformer_engine[pytorch]
 flask
