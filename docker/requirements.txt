@@ -15,4 +15,4 @@ causal-conv1d
 mamba-ssm
 # huggingface_hub==0.23.4
 # transformers==4.44.2
-vllm==0.8.5
+vllm==0.7.3
