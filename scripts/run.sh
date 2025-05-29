@@ -67,6 +67,16 @@ if [ "$MODEL_FRAMEWORK" == "vllm" ]; then
         --disable-custom-all-reduce \
         &
 
+elif [ "$MODEL_FRAMEWORK" == "vllm_custom" ]; then
+    python pred/serve_vllm.py \
+        --model=${MODEL_PATH} \
+        --model-impl transformers \ 
+        --trust-remote-code \
+        --tensor-parallel-size=${GPUS} \
+        --dtype bfloat16 \
+        --disable-custom-all-reduce \
+        &
+
 elif [ "$MODEL_FRAMEWORK" == "trtllm" ]; then
     python pred/serve_trt.py \
         --model_path=${MODEL_PATH} \
