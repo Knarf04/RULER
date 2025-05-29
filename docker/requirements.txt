@@ -1,4 +1,4 @@
-# nemo_toolkit['all']==2.1.0
+nemo-toolkit[all]
 tritonclient[all]
 transformer_engine[pytorch]
 flask
@@ -11,8 +11,6 @@ openai
 tiktoken
 tenacity
 accelerate
-causal-conv1d 
-mamba-ssm
-# huggingface_hub==0.23.4
-# transformers==4.44.2
-vllm==0.7.3
+huggingface_hub==0.23.4
+transformers==4.44.2
+vllm==0.5.4
