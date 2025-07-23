@@ -16,10 +16,10 @@
 # container: docker.io/cphsieh/ruler:0.1.0
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
-if [ $# -ne 2 ]; then
-    echo "Usage: $0 <model_name> $1 <benchmark_name>"
-    exit 1
-fi
+# if [ $# -ne 2 ]; then
+#     echo "Usage: $0 <model_name> $1 <benchmark_name>"
+#     exit 1
+# fi
 
 
 # Root Directories
