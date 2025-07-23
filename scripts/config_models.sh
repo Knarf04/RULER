@@ -15,14 +15,14 @@
 TEMPERATURE="0.0" # greedy
 TOP_P="1.0"
 TOP_K="32"
-SEQ_LENGTHS=(
-    # 131072
-    # 65536
-    # 32768
-    # 16384
-    8192
-    4096
-)
+# SEQ_LENGTHS=(
+#     4096
+#     8192
+#     16384
+#     32768
+#     65536
+#     131072
+# )
 
 MODEL_SELECT() {
     MODEL_NAME=$1
@@ -93,15 +93,25 @@ MODEL_SELECT() {
             MODEL_TEMPLATE_TYPE="base"
             MODEL_FRAMEWORK="vllm"
             ;;
-        nemotron-h-8b)
+        nemotron-h-8b-hf)
             MODEL_PATH="${MODEL_DIR}/nemotron_h_8b"
             MODEL_TEMPLATE_TYPE="base"
             MODEL_FRAMEWORK="hf"
             ;;
-        nemotron-h-8b-vllm)
+        nemotron-h-8b)
             MODEL_PATH="${MODEL_DIR}/nemotron_h_8b"
             MODEL_TEMPLATE_TYPE="base"
-            MODEL_FRAMEWORK="vllm_custom"
+            MODEL_FRAMEWORK="vllm"
+            ;;
+        custom-hf)
+            MODEL_PATH="${MODEL_DIR}"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="hf"
+            ;;
+        custom-vllm)
+            MODEL_PATH="${MODEL_DIR}"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="vllm"
             ;;
     esac
 

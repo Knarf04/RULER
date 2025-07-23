@@ -25,10 +25,19 @@ fi
 # Root Directories
 GPUS="8" # GPU size for tensor_parallel.
 ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
-MODEL_DIR="/gpfs/hshen/hf-ckpt" # the path that contains individual model folders from Huggingface.
+MODEL_DIR=${3} # the path that contains individual model folders from Huggingface.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
-BATCH_SIZE=16  # increase to improve GPU utilization
-
+SEQ_LENGTHS=${4}
+BATCH_SIZE=${5}
+# BATCH_SIZE=16  # increase to improve GPU utilization
+# SEQ_LENGTHS=(
+#     4096
+#     8192
+#     16384
+#     32768
+#     65536
+#     131072
+# )
 
 # Model and Tokenizer
 source config_models.sh
@@ -62,20 +71,17 @@ fi
 if [ "$MODEL_FRAMEWORK" == "vllm" ]; then
     python pred/serve_vllm.py \
         --model=${MODEL_PATH} \
-        --tensor-parallel-size=${GPUS} \
-        --dtype bfloat16 \
-        --disable-custom-all-reduce \
-        &
-
-elif [ "$MODEL_FRAMEWORK" == "vllm_custom" ]; then
-    python pred/serve_vllm.py \
-        --model=${MODEL_PATH} \
-        --model-impl transformers \ 
         --trust-remote-code \
         --tensor-parallel-size=${GPUS} \
         --dtype bfloat16 \
         --disable-custom-all-reduce \
+        --gpu-memory-utilization 0.60
         &
+    echo "Waiting for inference server to be ready on port 5000..."
+    until curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; do
+    sleep 60
+    done
+    echo "[vLLM] Model server is up!"
 
 elif [ "$MODEL_FRAMEWORK" == "trtllm" ]; then
     python pred/serve_trt.py \
