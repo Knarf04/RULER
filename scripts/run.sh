@@ -75,7 +75,7 @@ if [ "$MODEL_FRAMEWORK" == "vllm" ]; then
         --tensor-parallel-size=${GPUS} \
         --dtype bfloat16 \
         --disable-custom-all-reduce \
-        --gpu-memory-utilization 0.60
+        --gpu-memory-utilization 0.60 \
         &
     echo "Waiting for inference server to be ready on port 5000..."
     until curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; do
