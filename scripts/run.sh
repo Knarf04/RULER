@@ -17,7 +17,7 @@
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
 if [ $# -ne 5 ]; then
-    echo "Usage: $0 <model_name> <display_name> <benchmark_name> <model_directory> <sequence_length> <batch_size>"
+    echo "Usage: $0 <model_name> <display_name> <model_directory> <benchmark_name> <sequence_length> <batch_size>"
     exit 1
 fi
 
@@ -26,7 +26,7 @@ fi
 GPUS="8" # GPU size for tensor_parallel.
 ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
 DISPLAY_NAME=${2}
-MODEL_DIR=${4} # the path that contains individual model folders from Huggingface.
+MODEL_DIR=${3} # the path that contains individual model folders from Huggingface.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
 SEQ_LENGTHS=${5}
 BATCH_SIZE=${6}
@@ -51,7 +51,7 @@ export AZURE_API_ENDPOINT=${AZURE_ENDPOINT}
 
 # Benchmark and Tasks
 source config_tasks.sh
-BENCHMARK=${3}
+BENCHMARK=${4}
 declare -n TASKS=$BENCHMARK
 if [ -z "${TASKS}" ]; then
     echo "Benchmark: ${BENCHMARK} is not supported"
