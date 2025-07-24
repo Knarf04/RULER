@@ -17,7 +17,7 @@
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
 if [ $# -ne 5 ]; then
-    echo "Usage: $0 <model_name> <benchmark_name> <model_directory> <sequence_length> <batch_size>"
+    echo "Usage: $0 <model_name> <display_name> <benchmark_name> <model_directory> <sequence_length> <batch_size>"
     exit 1
 fi
 
@@ -25,10 +25,11 @@ fi
 # Root Directories
 GPUS="8" # GPU size for tensor_parallel.
 ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
-MODEL_DIR=${3} # the path that contains individual model folders from Huggingface.
+DISPLAY_NAME=${2}
+MODEL_DIR=${4} # the path that contains individual model folders from Huggingface.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
-SEQ_LENGTHS=${4}
-BATCH_SIZE=${5}
+SEQ_LENGTHS=${5}
+BATCH_SIZE=${6}
 
 # Model and Tokenizer
 source config_models.sh
@@ -50,7 +51,7 @@ export AZURE_API_ENDPOINT=${AZURE_ENDPOINT}
 
 # Benchmark and Tasks
 source config_tasks.sh
-BENCHMARK=${2}
+BENCHMARK=${3}
 declare -n TASKS=$BENCHMARK
 if [ -z "${TASKS}" ]; then
     echo "Benchmark: ${BENCHMARK} is not supported"
@@ -101,7 +102,7 @@ for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
 
     # Modified the data generation logic here: make the generation consistent for all models
     DATA_DIR="${ROOT_DIR}/data/${BENCHMARK}/${MAX_SEQ_LENGTH}"
-    PRED_DIR="${ROOT_DIR}/${MODEL_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}/pred"
+    PRED_DIR="${ROOT_DIR}/${DISPLAY_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}/pred"
     mkdir -p ${DATA_DIR}
     mkdir -p ${PRED_DIR}
     
