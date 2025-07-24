@@ -16,7 +16,7 @@
 # container: docker.io/cphsieh/ruler:0.1.0
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
-if [ $# -ne 5 ]; then
+if [ $# -ne 6 ]; then
     echo "Usage: $0 <model_name> <display_name> <model_directory> <benchmark_name> <sequence_length> <batch_size>"
     exit 1
 fi
