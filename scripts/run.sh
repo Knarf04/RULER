@@ -16,10 +16,10 @@
 # container: docker.io/cphsieh/ruler:0.1.0
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
-# if [ $# -ne 2 ]; then
-#     echo "Usage: $0 <model_name> $1 <benchmark_name>"
-#     exit 1
-# fi
+if [ $# -ne 5 ]; then
+    echo "Usage: $0 <model_name> <benchmark_name> <model_directory> <sequence_length> <batch_size>"
+    exit 1
+fi
 
 
 # Root Directories
@@ -29,15 +29,6 @@ MODEL_DIR=${3} # the path that contains individual model folders from Huggingfac
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
 SEQ_LENGTHS=${4}
 BATCH_SIZE=${5}
-# BATCH_SIZE=16  # increase to improve GPU utilization
-# SEQ_LENGTHS=(
-#     4096
-#     8192
-#     16384
-#     32768
-#     65536
-#     131072
-# )
 
 # Model and Tokenizer
 source config_models.sh
