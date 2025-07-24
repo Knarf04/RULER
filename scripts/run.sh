@@ -60,20 +60,24 @@ fi
 
 # Start server (you may want to run in other container.)
 if [ "$MODEL_FRAMEWORK" == "vllm" ]; then
-    python pred/serve_vllm.py \
-        --model=${MODEL_PATH} \
-        --trust-remote-code \
-        --tensor-parallel-size=${GPUS} \
-        --dtype bfloat16 \
-        --disable-custom-all-reduce \
-        --gpu-memory-utilization 0.60 \
-        &
-    echo "Waiting for inference server to be ready on port 5000..."
-    until curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; do
-    sleep 60
-    done
-    echo "[vLLM] Model server is up!"
-
+    if curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; then
+        echo "[vLLM] Model server is already running on port 5000."
+    else
+        echo "[vLLM] Launching model server..."
+        python pred/serve_vllm.py \
+            --model=${MODEL_PATH} \
+            --trust-remote-code \
+            --tensor-parallel-size=${GPUS} \
+            --dtype bfloat16 \
+            --disable-custom-all-reduce \
+            --gpu-memory-utilization 0.60 \
+            &
+        echo "Waiting for inference server to be ready on port 5000..."
+        until curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; do
+        sleep 60
+        done
+        echo "[vLLM] Model server is up!"
+    fi
 elif [ "$MODEL_FRAMEWORK" == "trtllm" ]; then
     python pred/serve_trt.py \
         --model_path=${MODEL_PATH} \
