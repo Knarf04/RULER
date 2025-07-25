@@ -40,7 +40,6 @@ class HuggingFaceModel:
                 torch_dtype=torch.bfloat16,
                 model_kwargs=model_kwargs,
             )
-            print("Huggingface pipeline successfully loaded!")
         except:
             self.pipeline = None
             self.model = AutoModelForCausalLM.from_pretrained(name_or_path, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16,)
