@@ -15,14 +15,14 @@
 TEMPERATURE="0.0" # greedy
 TOP_P="1.0"
 TOP_K="32"
-SEQ_LENGTHS=(
-    131072
-    65536
-    32768
-    16384
-    8192
-    4096
-)
+# SEQ_LENGTHS=(
+#     4096
+#     8192
+#     16384
+#     32768
+#     65536
+#     131072
+# )
 
 MODEL_SELECT() {
     MODEL_NAME=$1
@@ -36,7 +36,7 @@ MODEL_SELECT() {
             MODEL_FRAMEWORK="vllm"
             ;;
         llama3.1-8b-chat)
-            MODEL_PATH="${MODEL_DIR}/llama3.1-8b-Instruct"
+            MODEL_PATH="${MODEL_DIR}/llama3_1_8B"
             MODEL_TEMPLATE_TYPE="meta-llama3"
             MODEL_FRAMEWORK="vllm"
             ;;
@@ -82,6 +82,36 @@ MODEL_SELECT() {
             TOKENIZER_PATH=$MODEL_PATH
             TOKENIZER_TYPE="gemini"
             GEMINI_API_KEY=""
+            ;;
+        bamba-9b-v1)
+            MODEL_PATH="${MODEL_DIR}/bamba_9b_v1"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="vllm"
+            ;;
+        bamba-9b-v2)
+            MODEL_PATH="${MODEL_DIR}/bamba_9b_v2"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="vllm"
+            ;;
+        nemotron-h-8b-hf)
+            MODEL_PATH="${MODEL_DIR}/nemotron_h_8b"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="hf"
+            ;;
+        nemotron-h-8b)
+            MODEL_PATH="${MODEL_DIR}/nemotron_h_8b"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="vllm"
+            ;;
+        custom-hf)
+            MODEL_PATH="${MODEL_DIR}"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="hf"
+            ;;
+        custom-vllm)
+            MODEL_PATH="${MODEL_DIR}"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="vllm"
             ;;
     esac
 

@@ -16,19 +16,20 @@
 # container: docker.io/cphsieh/ruler:0.1.0
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
-if [ $# -ne 2 ]; then
-    echo "Usage: $0 <model_name> $1 <benchmark_name>"
+if [ $# -ne 6 ]; then
+    echo "Usage: $0 <model_name> <display_name> <model_directory> <benchmark_name> <sequence_length> <batch_size>"
     exit 1
 fi
 
 
 # Root Directories
-GPUS="1" # GPU size for tensor_parallel.
-ROOT_DIR="benchmark_root" # the path that stores generated task samples and model predictions.
-MODEL_DIR="../.." # the path that contains individual model folders from HUggingface.
+GPUS="8" # GPU size for tensor_parallel.
+ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
+DISPLAY_NAME=${2}
+MODEL_DIR=${3} # the path that contains individual model folders from Huggingface.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
-BATCH_SIZE=1  # increase to improve GPU utilization
-
+SEQ_LENGTHS=${5}
+BATCH_SIZE=${6}
 
 # Model and Tokenizer
 source config_models.sh
@@ -50,7 +51,7 @@ export AZURE_API_ENDPOINT=${AZURE_ENDPOINT}
 
 # Benchmark and Tasks
 source config_tasks.sh
-BENCHMARK=${2}
+BENCHMARK=${4}
 declare -n TASKS=$BENCHMARK
 if [ -z "${TASKS}" ]; then
     echo "Benchmark: ${BENCHMARK} is not supported"
@@ -60,13 +61,24 @@ fi
 
 # Start server (you may want to run in other container.)
 if [ "$MODEL_FRAMEWORK" == "vllm" ]; then
-    python pred/serve_vllm.py \
-        --model=${MODEL_PATH} \
-        --tensor-parallel-size=${GPUS} \
-        --dtype bfloat16 \
-        --disable-custom-all-reduce \
-        &
-
+    if curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; then
+        echo "[vLLM] Model server is already running on port 5000."
+    else
+        echo "[vLLM] Launching model server..."
+        python pred/serve_vllm.py \
+            --model=${MODEL_PATH} \
+            --trust-remote-code \
+            --tensor-parallel-size=${GPUS} \
+            --dtype bfloat16 \
+            --disable-custom-all-reduce \
+            --gpu-memory-utilization 0.60 \
+            &
+        echo "Waiting for inference server to be ready on port 5000..."
+        until curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; do
+        sleep 60
+        done
+        echo "[vLLM] Model server is up!"
+    fi
 elif [ "$MODEL_FRAMEWORK" == "trtllm" ]; then
     python pred/serve_trt.py \
         --model_path=${MODEL_PATH} \
@@ -87,10 +99,10 @@ fi
 # Start client (prepare data / call model API / obtain final metrics)
 total_time=0
 for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
-    
-    RESULTS_DIR="${ROOT_DIR}/${MODEL_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}"
-    DATA_DIR="${RESULTS_DIR}/data"
-    PRED_DIR="${RESULTS_DIR}/pred"
+
+    # Modified the data generation logic here: make the generation consistent for all models
+    DATA_DIR="${ROOT_DIR}/data/${BENCHMARK}/${MAX_SEQ_LENGTH}"
+    PRED_DIR="${ROOT_DIR}/${DISPLAY_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}/pred"
     mkdir -p ${DATA_DIR}
     mkdir -p ${PRED_DIR}
     
