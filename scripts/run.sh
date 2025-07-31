@@ -16,7 +16,7 @@
 # container: docker.io/cphsieh/ruler:0.1.0
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
-if [ $# -ne 6 ]; then
+if [ $# -ne 8 ]; then
     echo "Usage: $0 <model_name> <display_name> <model_directory> <tokenizer_type> <benchmark_name> <sequence_length> <batch_size> <tensor_parallel>"
     exit 1
 fi
@@ -24,17 +24,18 @@ fi
 
 # Root Directories
 ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
+ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
+MODEL_NAME=${1}
 DISPLAY_NAME=${2}
 MODEL_DIR=${3} # the path that contains individual model folders from Huggingface.
-ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
 TOKENIZER=${4} # Make sure generation is not done repeatedly for the same tokenizer
+BENCHMARK=${5}
 SEQ_LENGTHS=${6}
 BATCH_SIZE=${7}
 GPUS=${8} # GPU size for tensor_parallel.
 
 # Model and Tokenizer
 source config_models.sh
-MODEL_NAME=${1}
 MODEL_CONFIG=$(MODEL_SELECT ${MODEL_NAME} ${MODEL_DIR} ${ENGINE_DIR})
 IFS=":" read MODEL_PATH MODEL_TEMPLATE_TYPE MODEL_FRAMEWORK TOKENIZER_PATH TOKENIZER_TYPE OPENAI_API_KEY GEMINI_API_KEY AZURE_ID AZURE_SECRET AZURE_ENDPOINT <<< "$MODEL_CONFIG"
 if [ -z "${MODEL_PATH}" ]; then
@@ -52,7 +53,6 @@ export AZURE_API_ENDPOINT=${AZURE_ENDPOINT}
 
 # Benchmark and Tasks
 source config_tasks.sh
-BENCHMARK=${5}
 declare -n TASKS=$BENCHMARK
 if [ -z "${TASKS}" ]; then
     echo "Benchmark: ${BENCHMARK} is not supported"
