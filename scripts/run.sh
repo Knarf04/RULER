@@ -17,19 +17,20 @@
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
 if [ $# -ne 6 ]; then
-    echo "Usage: $0 <model_name> <display_name> <model_directory> <benchmark_name> <sequence_length> <batch_size>"
+    echo "Usage: $0 <model_name> <display_name> <model_directory> <benchmark_name> <sequence_length> <batch_size> <tensor_parallel>"
     exit 1
 fi
 
 
 # Root Directories
-GPUS="8" # GPU size for tensor_parallel.
 ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
 DISPLAY_NAME=${2}
 MODEL_DIR=${3} # the path that contains individual model folders from Huggingface.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
 SEQ_LENGTHS=${5}
 BATCH_SIZE=${6}
+GPUS=${7} # GPU size for tensor_parallel.
+
 
 # Model and Tokenizer
 source config_models.sh
