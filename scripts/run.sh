@@ -17,7 +17,7 @@
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
 if [ $# -ne 6 ]; then
-    echo "Usage: $0 <model_name> <display_name> <model_directory> <benchmark_name> <sequence_length> <batch_size> <tensor_parallel>"
+    echo "Usage: $0 <model_name> <display_name> <model_directory> <tokenizer_type> <benchmark_name> <sequence_length> <batch_size> <tensor_parallel>"
     exit 1
 fi
 
@@ -27,10 +27,10 @@ ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and m
 DISPLAY_NAME=${2}
 MODEL_DIR=${3} # the path that contains individual model folders from Huggingface.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
-SEQ_LENGTHS=${5}
-BATCH_SIZE=${6}
-GPUS=${7} # GPU size for tensor_parallel.
-
+TOKENIZER=${4} # Make sure generation is not done repeatedly for the same tokenizer
+SEQ_LENGTHS=${6}
+BATCH_SIZE=${7}
+GPUS=${8} # GPU size for tensor_parallel.
 
 # Model and Tokenizer
 source config_models.sh
@@ -52,7 +52,7 @@ export AZURE_API_ENDPOINT=${AZURE_ENDPOINT}
 
 # Benchmark and Tasks
 source config_tasks.sh
-BENCHMARK=${4}
+BENCHMARK=${5}
 declare -n TASKS=$BENCHMARK
 if [ -z "${TASKS}" ]; then
     echo "Benchmark: ${BENCHMARK} is not supported"
@@ -102,7 +102,7 @@ total_time=0
 for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
 
     # Modified the data generation logic here: make the generation consistent for all models
-    DATA_DIR="${ROOT_DIR}/data/${BENCHMARK}/${MAX_SEQ_LENGTH}"
+    DATA_DIR="${ROOT_DIR}/data/${TOKENIZER}/${BENCHMARK}/${MAX_SEQ_LENGTH}"
     PRED_DIR="${ROOT_DIR}/${DISPLAY_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}/pred"
     mkdir -p ${DATA_DIR}
     mkdir -p ${PRED_DIR}
