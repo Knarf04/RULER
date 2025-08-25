@@ -23,7 +23,7 @@ fi
 
 
 # Root Directories
-ROOT_DIR="/work/hdd/bcjw/hshen14/RULER" # the path that stores generated task samples and model predictions.
+ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
 MODEL_NAME=${1}
 DISPLAY_NAME=${2}
