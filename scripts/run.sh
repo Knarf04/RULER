@@ -23,7 +23,7 @@ fi
 
 
 # Root Directories
-ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
+ROOT_DIR="/work/hdd/bcjw/hshen14/RULER" # the path that stores generated task samples and model predictions.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
 MODEL_NAME=${1}
 DISPLAY_NAME=${2}
@@ -33,6 +33,9 @@ BENCHMARK=${5}
 SEQ_LENGTHS=${6}
 BATCH_SIZE=${7}
 GPUS=${8} # GPU size for tensor_parallel.
+
+# Update model config
+python update_experiments.py ${MODEL_DIR}/config.json --set seq_len_scaled ${SEQ_LENGTHS}
 
 # Model and Tokenizer
 source config_models.sh
@@ -95,9 +98,6 @@ elif [ "$MODEL_FRAMEWORK" == "sglang" ]; then
     # use sglang/test/killall_sglang.sh to kill sglang server if it hangs
 
 fi
-
-# Update model config
-python update_experiments.py ${MODEL_PATH}/config.json --set seq_len_scaled ${SEQ_LENGTHS}
 
 # Start client (prepare data / call model API / obtain final metrics)
 total_time=0
