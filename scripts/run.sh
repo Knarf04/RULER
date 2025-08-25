@@ -23,7 +23,7 @@ fi
 
 
 # Root Directories
-ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
+ROOT_DIR="/work/hdd/bcjw/hshen14/RULER" # the path that stores generated task samples and model predictions.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
 MODEL_NAME=${1}
 DISPLAY_NAME=${2}
@@ -72,7 +72,7 @@ if [ "$MODEL_FRAMEWORK" == "vllm" ]; then
             --tensor-parallel-size=${GPUS} \
             --dtype bfloat16 \
             --disable-custom-all-reduce \
-            --gpu-memory-utilization 0.60 \
+            --gpu-memory-utilization 0.50 \
             &
         echo "Waiting for inference server to be ready on port 5000..."
         until curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; do
@@ -96,6 +96,8 @@ elif [ "$MODEL_FRAMEWORK" == "sglang" ]; then
 
 fi
 
+# Update model config
+python update_experiments.py ${MODEL_PATH}/config.json --set seq_len_scaled ${SEQ_LENGTHS}
 
 # Start client (prepare data / call model API / obtain final metrics)
 total_time=0

@@ -36,7 +36,7 @@ MODEL_SELECT() {
             MODEL_FRAMEWORK="vllm"
             ;;
         llama3.1-8b-chat)
-            MODEL_PATH="${MODEL_DIR}/llama3_1_8B"
+            MODEL_PATH="${MODEL_DIR}"
             MODEL_TEMPLATE_TYPE="meta-llama3"
             MODEL_FRAMEWORK="vllm"
             ;;
