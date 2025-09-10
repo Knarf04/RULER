@@ -34,9 +34,6 @@ SEQ_LENGTHS=${6}
 BATCH_SIZE=${7}
 GPUS=${8} # GPU size for tensor_parallel.
 
-# Update model config
-python update_experiments.py ${MODEL_DIR}/config.json --set seq_len_scaled ${SEQ_LENGTHS}
-
 # Model and Tokenizer
 source config_models.sh
 MODEL_CONFIG=$(MODEL_SELECT ${MODEL_NAME} ${MODEL_DIR} ${ENGINE_DIR})
