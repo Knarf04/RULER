@@ -16,8 +16,8 @@
 # container: docker.io/cphsieh/ruler:0.1.0
 # bash run.sh MODEL_NAME BENCHMARK_NAME
 
-if [ $# -ne 8 ]; then
-    echo "Usage: $0 <model_name> <display_name> <model_directory> <tokenizer_type> <benchmark_name> <sequence_length> <batch_size> <tensor_parallel>"
+if [ $# -ne 7 ]; then
+    echo "Usage: $0 <fms_name> <disp_name> <model_directory> <tokenizer_type> <benchmark_name> <sequence_length> <batch_size>"
     exit 1
 fi
 
@@ -25,14 +25,15 @@ fi
 # Root Directories
 ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
-MODEL_NAME=${1}
+MODEL_NAME="custom-fms"
+FMS_NAME=${1} # FMS configuration name
 DISPLAY_NAME=${2}
 MODEL_DIR=${3} # the path that contains individual model folders from Huggingface.
 TOKENIZER=${4} # Make sure generation is not done repeatedly for the same tokenizer
 BENCHMARK=${5}
 SEQ_LENGTHS=${6}
 BATCH_SIZE=${7}
-GPUS=${8} # GPU size for tensor_parallel.
+GPUS=1
 
 # Model and Tokenizer
 source config_models.sh
@@ -59,50 +60,13 @@ if [ -z "${TASKS}" ]; then
     exit 1
 fi
 
-
-# Start server (you may want to run in other container.)
-if [ "$MODEL_FRAMEWORK" == "vllm" ]; then
-    if curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; then
-        echo "[vLLM] Model server is already running on port 5000."
-    else
-        echo "[vLLM] Launching model server..."
-        python pred/serve_vllm.py \
-            --model=${MODEL_PATH} \
-            --trust-remote-code \
-            --tensor-parallel-size=${GPUS} \
-            --dtype bfloat16 \
-            --disable-custom-all-reduce \
-            --gpu-memory-utilization 0.50 \
-            &
-        echo "Waiting for inference server to be ready on port 5000..."
-        until curl -sf http://127.0.0.1:5000/health >/dev/null 2>&1; do
-        sleep 60
-        done
-        echo "[vLLM] Model server is up!"
-    fi
-elif [ "$MODEL_FRAMEWORK" == "trtllm" ]; then
-    python pred/serve_trt.py \
-        --model_path=${MODEL_PATH} \
-        &
-
-elif [ "$MODEL_FRAMEWORK" == "sglang" ]; then
-    python -m sglang.launch_server \
-        --model-path ${MODEL_PATH} \
-        --tp ${GPUS} \
-        --port 5000 \
-        --enable-flashinfer \
-        &
-    # use sglang/test/killall_sglang.sh to kill sglang server if it hangs
-
-fi
-
 # Start client (prepare data / call model API / obtain final metrics)
 total_time=0
 for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
 
     # Modified the data generation logic here: make the generation consistent for all models
     DATA_DIR="${ROOT_DIR}/data/${TOKENIZER}/${BENCHMARK}/${MAX_SEQ_LENGTH}"
-    PRED_DIR="${ROOT_DIR}/${DISPLAY_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}/pred"
+    PRED_DIR="${ROOT_DIR}/fms/${DISPLAY_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}/pred"
     mkdir -p ${DATA_DIR}
     mkdir -p ${PRED_DIR}
     
@@ -130,6 +94,7 @@ for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
             --top_k ${TOP_K} \
             --top_p ${TOP_P} \
             --batch_size ${BATCH_SIZE} \
+            --fms_variant ${FMS_NAME} \
             ${STOP_WORDS}
         end_time=$(date +%s)
         time_diff=$((end_time - start_time))
