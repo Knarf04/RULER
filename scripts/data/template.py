@@ -29,7 +29,15 @@ Templates = {
 
     'Phi3': "<|user|>\n{task_template}<|end|>\n<|assistant|>\n",
 
+    'bamba': "<|user|>\n{task_template}\n<|assistant|>\n",
+
+    'long-context': "<|user|>\n{task_template}\n<|assistant|>\n",
+    
+    'nemo': "\n<SPECIAL_11>User\n{task_template}\n<SPECIAL_11>Assistant\n<think></think>",
+
     'meta-llama3': "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{task_template}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+
+    'granite': "<|start_of_role|>user<|end_of_role|>{task_template}<|end_of_text|><|start_of_role|>assistant<|end_of_role|>",
     
     'jamba': "<|startoftext|><|bom|><|system|> <|eom|><|bom|><|user|> {task_template}<|eom|><|bom|><|assistant|>",
 }

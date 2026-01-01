@@ -130,6 +130,7 @@ for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
             --top_k ${TOP_K} \
             --top_p ${TOP_P} \
             --batch_size ${BATCH_SIZE} \
+            --fms_variant ${DISPLAY_NAME} \
             ${STOP_WORDS}
         end_time=$(date +%s)
         time_diff=$((end_time - start_time))

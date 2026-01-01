@@ -113,6 +113,11 @@ MODEL_SELECT() {
             MODEL_TEMPLATE_TYPE="base"
             MODEL_FRAMEWORK="vllm"
             ;;
+        custom-fms)
+            MODEL_PATH="${MODEL_DIR}"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="fms"
+            ;;
     esac
 
 
