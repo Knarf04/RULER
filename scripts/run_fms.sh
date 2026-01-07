@@ -65,7 +65,8 @@ total_time=0
 for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
 
     # Modified the data generation logic here: make the generation consistent for all models
-    DATA_DIR="${ROOT_DIR}/data/${TOKENIZER}/${BENCHMARK}/${MAX_SEQ_LENGTH}"
+    # DATA_DIR="${ROOT_DIR}/data/${TOKENIZER}/${BENCHMARK}/${MAX_SEQ_LENGTH}"
+    DATA_DIR="${ROOT_DIR}/data_dliu/${TOKENIZER}/${BENCHMARK}/${MAX_SEQ_LENGTH}"
     PRED_DIR="${ROOT_DIR}/fms/${DISPLAY_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}/pred"
     mkdir -p ${DATA_DIR}
     mkdir -p ${PRED_DIR}
