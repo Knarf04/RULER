@@ -80,14 +80,21 @@ class FMSModel:
         print(f'{self._fms_model.config=}')
         self.pipeline = None
 
+        # Must disable weight init: from_fms_model triggers PreTrainedModel.__init__
+        # -> post_init() -> init_weights() which re-initializes all submodule weights
+        # in transformers >= 4.57.0 (where _init_weights changed from no-op to active).
+        from transformers.modeling_utils import no_init_weights
+
         if _architecture_name == 'llama':
             fms_hf_config = HFAdaptedLLaMAConfig.from_fms_config(self._fms_model.get_config())
-            self.model = HFAdaptedLLaMAForCausalLM.from_fms_model(self._fms_model, **fms_hf_config.to_dict())
+            with no_init_weights():
+                self.model = HFAdaptedLLaMAForCausalLM.from_fms_model(self._fms_model, **fms_hf_config.to_dict())
         elif _architecture_name == 'mamba':
             raise NotImplementedError()
         elif _architecture_name == 'granite':
             fms_hf_config = HFAdaptedGraniteConfig.from_fms_config(self._fms_model.get_config())
-            self.model = HFAdaptedGraniteForCausalLM.from_fms_model(self._fms_model, **fms_hf_config.to_dict())
+            with no_init_weights():
+                self.model = HFAdaptedGraniteForCausalLM.from_fms_model(self._fms_model, **fms_hf_config.to_dict())
         else:
             raise NotImplementedError()
 
