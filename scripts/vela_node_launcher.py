@@ -151,10 +151,10 @@ def main():
         print(f"Error: no sequence lengths found in {args.seq_lengths_file}")
         sys.exit(1)
 
-    # Build all (model, seq_len) combinations
-    all_jobs = list(product(models, seq_lengths))
+    # Build all (seq_len, model) combinations — iterate models first, then seq lengths
+    all_jobs = list(product(seq_lengths, models))
     print(f"[{timestamp()}] {len(models)} model(s) x {len(seq_lengths)} seq length(s) = {len(all_jobs)} total jobs", flush=True)
-    for i, ((fms_name, disp_name, model_dir, tokenizer, benchmark), seq_len) in enumerate(all_jobs):
+    for i, (seq_len, (fms_name, disp_name, model_dir, tokenizer, benchmark)) in enumerate(all_jobs):
         print(f"  [{i+1}] {disp_name} seq={seq_len}", flush=True)
     print(flush=True)
 
@@ -164,7 +164,7 @@ def main():
     job_meta = {}   # id(proc) -> {"label": str, "start_time": float}
     launcher_start = time.time()
 
-    for (fms_name, disp_name, model_dir, tokenizer, benchmark), seq_len in all_jobs:
+    for seq_len, (fms_name, disp_name, model_dir, tokenizer, benchmark) in all_jobs:
         gpu_id = wait_for_gpu(running, job_meta,
                               args.mem_threshold, args.util_threshold, args.poll_interval)
 
