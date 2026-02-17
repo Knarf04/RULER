@@ -186,6 +186,8 @@ def get_llm(tokens_to_generate):
         llm = FMSModel(
             name_or_path=args.model_name_or_path,
             variant=args.fms_variant,
+            task=args.task,
+            save_dir=str(args.save_dir),
             do_sample=args.temperature > 0,
             repetition_penalty=1,
             temperature=args.temperature,

@@ -14,13 +14,14 @@
 
 import json
 import logging
+import os
 import requests
 import torch
 from typing import Dict, List, Optional
 from torch import distributed as dist
 
 class FMSModel:
-    def __init__(self, name_or_path: str, variant: str, **generation_kwargs) -> None:
+    def __init__(self, name_or_path: str, variant: str, task: str = None, save_dir: str = None, **generation_kwargs) -> None:
         from transformers import AutoTokenizer, pipeline
         from fms.models import get_model
         from fms import models
@@ -30,6 +31,13 @@ class FMSModel:
         from fms.models.hf.granite.configuration_granite_hf import HFAdaptedGraniteConfig
         from fms_fsdp.utils.config_utils import get_model_config
         from fms.models.llama import _llama_factory_factory
+
+        self.task = task
+        self._log_file = None
+        if task and save_dir:
+            log_path = os.path.join(save_dir, f"{task}_exp.log")
+            os.makedirs(save_dir, exist_ok=True)
+            self._log_file = open(log_path, 'a')
 
         self.tokenizer = AutoTokenizer.from_pretrained(name_or_path, trust_remote_code=True)
         _config_data = get_model_config(variant)
@@ -115,6 +123,16 @@ class FMSModel:
             self.tokenizer.pad_token = self.tokenizer.eos_token
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
 
+    def _log_prune_stats(self):
+        if self._log_file is None:
+            return
+        for name, module in self.model.named_modules():
+            if hasattr(module, '_prefill_prune_stats'):
+                pruned_per_head, seq_len = module._prefill_prune_stats
+                self._log_file.write(f"{name}: {pruned_per_head}/{seq_len}\n")
+                del module._prefill_prune_stats
+        self._log_file.write("---\n")
+        self._log_file.flush()
 
     def __call__(self, prompt: str, **kwargs) -> dict:
         return self.process_batch([prompt], **kwargs)[0]
@@ -126,6 +144,7 @@ class FMSModel:
                 **inputs,
                 **self.generation_kwargs
             )
+            self._log_prune_stats()
             generated_texts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
         else:
             output = self.pipeline(text_inputs=prompts, **self.generation_kwargs, )
