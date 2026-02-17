@@ -129,8 +129,12 @@ class FMSModel:
         for name, module in self.model.named_modules():
             if hasattr(module, '_prefill_prune_stats'):
                 pruned_per_head, seq_len = module._prefill_prune_stats
-                self._log_file.write(f"{name}: {pruned_per_head}/{seq_len}\n")
+                self._log_file.write(f"{name} [prefill]: {pruned_per_head}/{seq_len}\n")
                 del module._prefill_prune_stats
+            if hasattr(module, '_decode_prune_stats'):
+                pruned_per_head, cache_len = module._decode_prune_stats
+                self._log_file.write(f"{name} [decode]: {pruned_per_head}/{cache_len}\n")
+                del module._decode_prune_stats
         self._log_file.write("---\n")
         self._log_file.flush()
 
