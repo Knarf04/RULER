@@ -1,31 +1,39 @@
 import argparse
 import ast
 import os
-import pandas as pd
+import re
+from collections import defaultdict
 from pathlib import Path
 
+import pandas as pd
 
-def parse_log(log_path, phase="decode"):
-    total_pruned = 0
-    total_tokens = 0
-    tag = f"[{phase}]:"
+
+def parse_log(log_path):
+    """Parse a single exp.log file.
+
+    Returns dict: {threshold: (total_pruned, total_tokens)} aggregated
+    across all layers and all samples.
+    """
+    # threshold -> (total_pruned, total_tokens)
+    agg = defaultdict(lambda: [0, 0])
 
     with open(log_path) as f:
         for line in f:
-            if tag not in line:
+            # Format: "layer_name @0.001: [n1, n2, ...]/seq_len"
+            m = re.match(r'.+ @([\d.]+): (.+)/(\d+)$', line.strip())
+            if not m:
                 continue
-            # Format: "layer_name [decode]: [n1, n2, ...]/cache_len"
-            stats_part = line.split(tag)[1].strip()
-            list_str, cache_len_str = stats_part.rsplit("/", 1)
-            pruned_per_head = ast.literal_eval(list_str)
-            cache_len = int(cache_len_str)
+            thresh = float(m.group(1))
+            pruned_per_head = ast.literal_eval(m.group(2))
+            seq_len = int(m.group(3))
 
-            total_pruned += sum(pruned_per_head)
-            total_tokens += len(pruned_per_head) * cache_len
+            agg[thresh][0] += sum(pruned_per_head)
+            agg[thresh][1] += len(pruned_per_head) * seq_len
 
-    if total_tokens == 0:
-        return None
-    return total_pruned / total_tokens
+    results = {}
+    for thresh, (pruned, total) in sorted(agg.items()):
+        results[thresh] = pruned / total if total > 0 else None
+    return results
 
 
 def main():
@@ -35,33 +43,32 @@ def main():
     args = parser.parse_args()
 
     log_files = sorted(args.data_dir.glob("*_exp.log"))
-
-    tasks = []
-    decode_sparsity = []
-    prefill_sparsity = []
-
-    for log_file in log_files:
-        task = log_file.stem.removesuffix("_exp")
-        tasks.append(task)
-
-        ratio = parse_log(log_file, phase="decode")
-        decode_sparsity.append(f"{ratio:.4%}" if ratio is not None else "N/A")
-
-        ratio = parse_log(log_file, phase="prefill")
-        prefill_sparsity.append(f"{ratio:.4%}" if ratio is not None else "N/A")
-
-    if not tasks:
+    if not log_files:
         print("No *_exp.log files found.")
         return
 
-    dfs = [
-        ['Tasks'] + tasks,
-        ['Prefill Sparsity'] + prefill_sparsity,
-        ['Decode Sparsity'] + decode_sparsity,
-    ]
+    # Collect results: {task: {threshold: ratio}}
+    all_results = {}
+    all_thresholds = set()
+    for log_file in log_files:
+        task = log_file.stem.removesuffix("_exp")
+        results = parse_log(log_file)
+        all_results[task] = results
+        all_thresholds.update(results.keys())
+
+    tasks = list(all_results.keys())
+    thresholds = sorted(all_thresholds)
+
+    rows = [['Tasks'] + tasks]
+    for thresh in thresholds:
+        row = [f'Sparsity@{thresh}']
+        for task in tasks:
+            ratio = all_results[task].get(thresh)
+            row.append(f"{ratio:.4%}" if ratio is not None else "N/A")
+        rows.append(row)
 
     output_file = os.path.join(args.data_dir, 'summary_sparsity.csv')
-    df = pd.DataFrame(dfs)
+    df = pd.DataFrame(rows)
     df.to_csv(output_file, index=False, sep='\t')
     print(df)
     print(f'\nSaved sparsity results to {output_file}')

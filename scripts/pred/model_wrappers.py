@@ -21,7 +21,10 @@ from typing import Dict, List, Optional
 from torch import distributed as dist
 
 class FMSModel:
-    def __init__(self, name_or_path: str, variant: str, task: str = None, save_dir: str = None, **generation_kwargs) -> None:
+    PRUNE_THRESHOLDS = [float(1/1000), float(1/100), float(1/20), float(1/15), float(1/11), float(1/10), float(1/9), float(1/8), float(1/7), float(1/6), float(1/5), float(1/4), float(1/3), float(1/2)]
+
+    def __init__(self, name_or_path: str, variant: str, task: str = None, save_dir: str = None,
+                 **generation_kwargs) -> None:
         from transformers import AutoTokenizer, pipeline
         from fms.models import get_model
         from fms import models
@@ -108,6 +111,12 @@ class FMSModel:
 
         self.model.eval()
 
+        # Set analysis thresholds on each attention module
+        from fms.modules.attention import MultiHeadAttention
+        for module in self.model.modules():
+            if isinstance(module, MultiHeadAttention):
+                module._analysis_thresholds = self.PRUNE_THRESHOLDS
+
         print(f'HF Adapted Version of Model: {self.model=}')
 
         generation_kwargs['use_cache'] = True
@@ -128,13 +137,10 @@ class FMSModel:
             return
         for name, module in self.model.named_modules():
             if hasattr(module, '_prefill_prune_stats'):
-                pruned_per_head, seq_len = module._prefill_prune_stats
-                self._log_file.write(f"{name} [prefill]: {pruned_per_head}/{seq_len}\n")
+                stats, seq_len = module._prefill_prune_stats
+                for thresh, pruned_per_head in stats.items():
+                    self._log_file.write(f"{name} @{thresh}: {pruned_per_head}/{seq_len}\n")
                 del module._prefill_prune_stats
-            if hasattr(module, '_decode_prune_stats'):
-                pruned_per_head, cache_len = module._decode_prune_stats
-                self._log_file.write(f"{name} [decode]: {pruned_per_head}/{cache_len}\n")
-                del module._decode_prune_stats
         self._log_file.write("---\n")
         self._log_file.flush()
 
