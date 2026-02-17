@@ -105,6 +105,9 @@ for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
     python eval/evaluate.py \
         --data_dir ${PRED_DIR} \
         --benchmark ${BENCHMARK}
+
+    python pred/parse_prune_log.py \
+        --data_dir ${PRED_DIR}
 done
 
 echo "Total time spent on call_api: $total_time seconds"

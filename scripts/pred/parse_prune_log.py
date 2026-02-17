@@ -1,19 +1,21 @@
 import argparse
 import ast
 import os
+import pandas as pd
 from pathlib import Path
 
 
-def parse_log(log_path):
+def parse_log(log_path, phase="decode"):
     total_pruned = 0
     total_tokens = 0
+    tag = f"[{phase}]:"
 
     with open(log_path) as f:
         for line in f:
-            if "[decode]:" not in line:
+            if tag not in line:
                 continue
             # Format: "layer_name [decode]: [n1, n2, ...]/cache_len"
-            stats_part = line.split("[decode]:")[1].strip()
+            stats_part = line.split(tag)[1].strip()
             list_str, cache_len_str = stats_part.rsplit("/", 1)
             pruned_per_head = ast.literal_eval(list_str)
             cache_len = int(cache_len_str)
@@ -28,21 +30,41 @@ def parse_log(log_path):
 
 def main():
     parser = argparse.ArgumentParser(description="Parse prune stats from exp.log files")
-    parser.add_argument("path", type=Path, help="Path to a single *_exp.log file or a directory containing them")
+    parser.add_argument("--data_dir", type=Path, required=True,
+                        help="Directory containing *_exp.log files (same as PRED_DIR)")
     args = parser.parse_args()
 
-    if args.path.is_file():
-        log_files = [args.path]
-    else:
-        log_files = sorted(args.path.glob("*_exp.log"))
+    log_files = sorted(args.data_dir.glob("*_exp.log"))
+
+    tasks = []
+    decode_sparsity = []
+    prefill_sparsity = []
 
     for log_file in log_files:
         task = log_file.stem.removesuffix("_exp")
-        ratio = parse_log(log_file)
-        if ratio is not None:
-            print(f"{task}: {ratio:.4%} pruned")
-        else:
-            print(f"{task}: no decode stats found")
+        tasks.append(task)
+
+        ratio = parse_log(log_file, phase="decode")
+        decode_sparsity.append(f"{ratio:.4%}" if ratio is not None else "N/A")
+
+        ratio = parse_log(log_file, phase="prefill")
+        prefill_sparsity.append(f"{ratio:.4%}" if ratio is not None else "N/A")
+
+    if not tasks:
+        print("No *_exp.log files found.")
+        return
+
+    dfs = [
+        ['Tasks'] + tasks,
+        ['Prefill Sparsity'] + prefill_sparsity,
+        ['Decode Sparsity'] + decode_sparsity,
+    ]
+
+    output_file = os.path.join(args.data_dir, 'summary_sparsity.csv')
+    df = pd.DataFrame(dfs)
+    df.to_csv(output_file, index=False, sep='\t')
+    print(df)
+    print(f'\nSaved sparsity results to {output_file}')
 
 
 if __name__ == "__main__":
