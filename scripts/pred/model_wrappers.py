@@ -21,7 +21,7 @@ from typing import Dict, List, Optional
 from torch import distributed as dist
 
 class FMSModel:
-    PRUNE_THRESHOLDS = [float(1/1000), float(1/100), float(1/20), float(1/15), float(1/11), float(1/10), float(1/9), float(1/8), float(1/7), float(1/6), float(1/5), float(1/4), float(1/3), float(1/2)]
+    PRUNE_THRESHOLDS = [float(1/1000), float(1/100), float(1/20), float(1/15), float(1/12), float(1/11), float(1/10), float(1/9), float(1/8), float(1/7), float(1/6), float(1/5), float(1/4), float(1/3), float(1/2)]
 
     def __init__(self, name_or_path: str, variant: str, task: str = None, save_dir: str = None,
                  **generation_kwargs) -> None:
