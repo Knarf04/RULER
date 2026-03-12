@@ -123,7 +123,7 @@ class FMSModel:
             from fms.models.hf.gated_delta_net.configuration_gated_delta_net_hf import HFAdaptedGDNConfig
             fms_hf_config = HFAdaptedGDNConfig.from_dict(self._fla_model.config.to_dict())
             with no_init_weights():
-                self.model = HFAdaptedGDNForCausalLM.from_fms_model(self._fla_model, **fms_hf_config.to_dict())
+                self.model = HFAdaptedGDNForCausalLM._hf_model_from_fms(self._fla_model, fms_hf_config)
         else:
             self._fms_model.eval()
             print(f'{self._fms_model=}')
