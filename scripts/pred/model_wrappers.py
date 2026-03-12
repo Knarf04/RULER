@@ -14,6 +14,7 @@
 
 import json
 import logging
+import os
 import requests
 import torch
 from typing import Dict, List, Optional
@@ -62,23 +63,33 @@ class FMSModel:
             print(f'{self._fla_model=}')
 
             print(f"Reading state dict from {name_or_path}")
-            state_dict = {"model_state": self._fla_model.state_dict()}
-            load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
+            if name_or_path.endswith('.pth'):
+                # Single-file checkpoint saved by save_single_file()
+                # Format: {"step": ..., "model_state": state_dict, ...}
+                ckpt = torch.load(name_or_path, map_location="cpu")
+                self._fla_model.load_state_dict(ckpt["model_state"])
+            else:
+                # Distributed checkpoint (FSDP2 sharded)
+                state_dict = {"model_state": self._fla_model.state_dict()}
+                load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
+                self._fla_model.load_state_dict(state_dict["model_state"])
 
             print("Loading state dict into the model...")
-            self._fla_model.load_state_dict(state_dict["model_state"])
             self._fla_model.to('cuda')
         else:
             self._fms_model = LLaMA(_config_data)
             print(f'{self._fms_model=}')
 
             print(f"Reading state dict from {name_or_path}")
-            state_dict = {"model_state": self._fms_model.state_dict()}
-
-            load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
+            if name_or_path.endswith('.pth'):
+                ckpt = torch.load(name_or_path, map_location="cpu")
+                self._fms_model.load_state_dict(ckpt["model_state"])
+            else:
+                state_dict = {"model_state": self._fms_model.state_dict()}
+                load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
+                self._fms_model.load_state_dict(state_dict["model_state"])
 
             print("Loading state dict into the model...")
-            self._fms_model.load_state_dict(state_dict["model_state"])
             self._fms_model.to('cuda')
         # Disable 'tp' for universal attention, put *.pth
         # self._fms_model = get_model(
