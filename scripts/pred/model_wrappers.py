@@ -38,10 +38,7 @@ class FMSModel:
         if _architecture_name == 'llama':
             models.register_model(_architecture_name, _variant, _llama_factory_factory(_config_data))
         elif _architecture_name == 'gdn':
-            # TODO: implement gated delta net model registration
-            # Should follow the same pattern as llama
-            from fms.models.gated_delta_net import _gated_delta_net_factory_factory
-            models.register_model(_architecture_name, _variant, _gated_delta_net_factory_factory(_config_data))
+            pass  # GDN uses fla model directly, no fms registration needed
         else:
             raise NotImplementedError()
 
