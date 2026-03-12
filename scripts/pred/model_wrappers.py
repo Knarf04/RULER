@@ -32,7 +32,8 @@ class FMSModel:
         from fms_fsdp.utils.config_utils import get_model_config
         from fms.models.llama import _llama_factory_factory
 
-        self.tokenizer = AutoTokenizer.from_pretrained(name_or_path, trust_remote_code=True)
+        tokenizer_path = os.path.dirname(name_or_path) if os.path.isfile(name_or_path) else name_or_path
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, trust_remote_code=True)
         _config_data = get_model_config(variant)
         _architecture_name, _variant = variant.split('_', 1)
 
