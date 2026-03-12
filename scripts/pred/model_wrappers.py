@@ -37,7 +37,7 @@ class FMSModel:
 
         if _architecture_name == 'llama':
             models.register_model(_architecture_name, _variant, _llama_factory_factory(_config_data))
-        elif _architecture_name == 'gated_delta_net':
+        elif _architecture_name == 'gdn':
             # TODO: implement gated delta net model registration
             # Should follow the same pattern as llama
             from fms.models.gated_delta_net import _gated_delta_net_factory_factory
@@ -54,7 +54,7 @@ class FMSModel:
         from fms.models.llama import LLaMA
         from torch.distributed._shard.checkpoint import FileSystemReader, load
 
-        if _architecture_name == 'gated_delta_net':
+        if _architecture_name == 'gdn':
             from fla.models.gated_deltanet import GatedDeltaNetForCausalLM, GatedDeltaNetConfig as FLAGDNConfig
             # fla uses vocab_size; fms config_utils returns src_vocab_size
             fla_config_data = dict(_config_data)
@@ -104,7 +104,7 @@ class FMSModel:
         # in transformers >= 4.57.0 (where _init_weights changed from no-op to active).
         from transformers.modeling_utils import no_init_weights
 
-        if _architecture_name == 'gated_delta_net':
+        if _architecture_name == 'gdn':
             # fla model is already HF-compatible; wrap via HFAdaptedGDNForCausalLM
             self._fla_model.eval()
             print(f'{self._fla_model=}')
