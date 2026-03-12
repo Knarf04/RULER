@@ -37,6 +37,11 @@ class FMSModel:
 
         if _architecture_name == 'llama':
             models.register_model(_architecture_name, _variant, _llama_factory_factory(_config_data))
+        elif _architecture_name == 'gated_delta_net':
+            # TODO: implement gated delta net model registration
+            # Should follow the same pattern as llama
+            from fms.models.gated_delta_net import _gated_delta_net_factory_factory
+            models.register_model(_architecture_name, _variant, _gated_delta_net_factory_factory(_config_data))
         else:
             raise NotImplementedError()
 
@@ -49,17 +54,35 @@ class FMSModel:
         from fms.models.llama import LLaMA
         from torch.distributed._shard.checkpoint import FileSystemReader, load
 
-        self._fms_model = LLaMA(_config_data)
-        print(f'{self._fms_model=}')
+        if _architecture_name == 'gated_delta_net':
+            from fla.models.gated_deltanet import GatedDeltaNetForCausalLM, GatedDeltaNetConfig as FLAGDNConfig
+            # fla uses vocab_size; fms config_utils returns src_vocab_size
+            fla_config_data = dict(_config_data)
+            if "src_vocab_size" in fla_config_data:
+                fla_config_data["vocab_size"] = fla_config_data.pop("src_vocab_size")
+            fla_config = FLAGDNConfig(**fla_config_data)
+            self._fla_model = GatedDeltaNetForCausalLM(fla_config)
+            print(f'{self._fla_model=}')
 
-        print(f"Reading state dict from {name_or_path}")
-        state_dict = {"model_state": self._fms_model.state_dict()}
+            print(f"Reading state dict from {name_or_path}")
+            state_dict = {"model_state": self._fla_model.state_dict()}
+            load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
 
-        load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
+            print("Loading state dict into the model...")
+            self._fla_model.load_state_dict(state_dict["model_state"])
+            self._fla_model.to('cuda')
+        else:
+            self._fms_model = LLaMA(_config_data)
+            print(f'{self._fms_model=}')
 
-        print("Loading state dict into the model...")
-        self._fms_model.load_state_dict(state_dict["model_state"])
-        self._fms_model.to('cuda')
+            print(f"Reading state dict from {name_or_path}")
+            state_dict = {"model_state": self._fms_model.state_dict()}
+
+            load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
+
+            print("Loading state dict into the model...")
+            self._fms_model.load_state_dict(state_dict["model_state"])
+            self._fms_model.to('cuda')
         # Disable 'tp' for universal attention, put *.pth
         # self._fms_model = get_model(
         #     _architecture_name,
@@ -74,10 +97,6 @@ class FMSModel:
         # )
 
         torch.set_grad_enabled(False)
-        self._fms_model.eval()
-
-        print(f'{self._fms_model=}')
-        print(f'{self._fms_model.config=}')
         self.pipeline = None
 
         # Must disable weight init: from_fms_model triggers PreTrainedModel.__init__
@@ -85,18 +104,34 @@ class FMSModel:
         # in transformers >= 4.57.0 (where _init_weights changed from no-op to active).
         from transformers.modeling_utils import no_init_weights
 
-        if _architecture_name == 'llama':
-            fms_hf_config = HFAdaptedLLaMAConfig.from_fms_config(self._fms_model.get_config())
+        if _architecture_name == 'gated_delta_net':
+            # fla model is already HF-compatible; wrap via HFAdaptedGDNForCausalLM
+            self._fla_model.eval()
+            print(f'{self._fla_model=}')
+            print(f'{self._fla_model.config=}')
+
+            from fms.models.hf.gated_delta_net.modeling_gated_delta_net_hf import HFAdaptedGDNForCausalLM
+            from fms.models.hf.gated_delta_net.configuration_gated_delta_net_hf import HFAdaptedGDNConfig
+            fms_hf_config = HFAdaptedGDNConfig.from_dict(self._fla_model.config.to_dict())
             with no_init_weights():
-                self.model = HFAdaptedLLaMAForCausalLM.from_fms_model(self._fms_model, **fms_hf_config.to_dict())
-        elif _architecture_name == 'mamba':
-            raise NotImplementedError()
-        elif _architecture_name == 'granite':
-            fms_hf_config = HFAdaptedGraniteConfig.from_fms_config(self._fms_model.get_config())
-            with no_init_weights():
-                self.model = HFAdaptedGraniteForCausalLM.from_fms_model(self._fms_model, **fms_hf_config.to_dict())
+                self.model = HFAdaptedGDNForCausalLM.from_fms_model(self._fla_model, **fms_hf_config.to_dict())
         else:
-            raise NotImplementedError()
+            self._fms_model.eval()
+            print(f'{self._fms_model=}')
+            print(f'{self._fms_model.config=}')
+
+            if _architecture_name == 'llama':
+                fms_hf_config = HFAdaptedLLaMAConfig.from_fms_config(self._fms_model.get_config())
+                with no_init_weights():
+                    self.model = HFAdaptedLLaMAForCausalLM.from_fms_model(self._fms_model, **fms_hf_config.to_dict())
+            elif _architecture_name == 'mamba':
+                raise NotImplementedError()
+            elif _architecture_name == 'granite':
+                fms_hf_config = HFAdaptedGraniteConfig.from_fms_config(self._fms_model.get_config())
+                with no_init_weights():
+                    self.model = HFAdaptedGraniteForCausalLM.from_fms_model(self._fms_model, **fms_hf_config.to_dict())
+            else:
+                raise NotImplementedError()
 
         self.model.eval()
 
