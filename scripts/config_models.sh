@@ -125,6 +125,9 @@ MODEL_SELECT() {
         if [ -f ${MODEL_PATH}/tokenizer.model ]; then
             TOKENIZER_PATH=${MODEL_PATH}/tokenizer.model
             TOKENIZER_TYPE="nemo"
+        elif [ -f ${MODEL_PATH}/../tokenizer_config.json ]; then
+            TOKENIZER_PATH=${MODEL_PATH}/../tokenizer_config.json
+            TOKENIZER_TYPE="hf"
         else
             TOKENIZER_PATH=${MODEL_PATH}
             TOKENIZER_TYPE="hf"
