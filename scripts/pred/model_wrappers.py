@@ -208,7 +208,12 @@ class HuggingFaceModel:
         if 'Yarn-Llama' in name_or_path:
             model_kwargs = None
         else:
-            model_kwargs = {"attn_implementation": "flash_attention_2", "tp_plan": None}
+            model_kwargs = {"attn_implementation": "flash_attention_2"}
+
+        from transformers import AutoConfig
+        config = AutoConfig.from_pretrained(name_or_path, trust_remote_code=True)
+        if hasattr(config, 'base_model_tp_plan'):
+            config.base_model_tp_plan = None
 
         try:
             self.pipeline = pipeline(
@@ -218,11 +223,11 @@ class HuggingFaceModel:
                 trust_remote_code=True,
                 device_map="auto",
                 torch_dtype=torch.bfloat16,
-                model_kwargs=model_kwargs,
+                model_kwargs={**(model_kwargs or {}), "config": config},
             )
         except:
             self.pipeline = None
-            self.model = AutoModelForCausalLM.from_pretrained(name_or_path, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16, tp_plan=None)
+            self.model = AutoModelForCausalLM.from_pretrained(name_or_path, config=config, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16)
             
         self.generation_kwargs = generation_kwargs
         self.stop = self.generation_kwargs.pop('stop')
