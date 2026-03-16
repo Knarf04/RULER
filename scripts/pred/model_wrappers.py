@@ -210,24 +210,19 @@ class HuggingFaceModel:
         else:
             model_kwargs = {"attn_implementation": "flash_attention_2"}
 
-        # Disable tensor parallelism — it requires torch.distributed which isn't
-        # available in single-GPU / non-torchrun environments.
-        import transformers.integrations.tensor_parallel as _tp_mod
-        _tp_mod.initialize_tensor_parallelism = lambda *a, **kw: (None, None, None)
-
         try:
             self.pipeline = pipeline(
                 "text-generation",
                 model=name_or_path,
                 tokenizer=self.tokenizer,
                 trust_remote_code=True,
-                device_map="auto",
+                device_map="cuda",
                 torch_dtype=torch.bfloat16,
                 model_kwargs=model_kwargs,
             )
         except:
             self.pipeline = None
-            self.model = AutoModelForCausalLM.from_pretrained(name_or_path, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16)
+            self.model = AutoModelForCausalLM.from_pretrained(name_or_path, trust_remote_code=True, torch_dtype=torch.bfloat16).to("cuda")
             
         self.generation_kwargs = generation_kwargs
         self.stop = self.generation_kwargs.pop('stop')
