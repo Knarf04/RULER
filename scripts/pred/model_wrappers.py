@@ -76,7 +76,7 @@ class FMSModel:
                 self._fla_model.load_state_dict(state_dict["model_state"])
 
             print("Loading state dict into the model...")
-            self._fla_model.to('cuda')
+            self._fla_model.to(dtype=torch.bfloat16, device='cuda')
         else:
             self._fms_model = LLaMA(_config_data)
             print(f'{self._fms_model=}')
@@ -91,7 +91,7 @@ class FMSModel:
                 self._fms_model.load_state_dict(state_dict["model_state"])
 
             print("Loading state dict into the model...")
-            self._fms_model.to('cuda')
+            self._fms_model.to(dtype=torch.bfloat16, device='cuda')
         # Disable 'tp' for universal attention, put *.pth
         # self._fms_model = get_model(
         #     _architecture_name,
