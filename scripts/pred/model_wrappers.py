@@ -210,10 +210,10 @@ class HuggingFaceModel:
         else:
             model_kwargs = {"attn_implementation": "flash_attention_2"}
 
-        from transformers import AutoConfig
-        config = AutoConfig.from_pretrained(name_or_path, trust_remote_code=True)
-        if hasattr(config, 'base_model_tp_plan'):
-            config.base_model_tp_plan = None
+        # Disable tensor parallelism — it requires torch.distributed which isn't
+        # available in single-GPU / non-torchrun environments.
+        import transformers.integrations.tensor_parallel as _tp_mod
+        _tp_mod.initialize_tensor_parallelism = lambda *a, **kw: (None, None, None)
 
         try:
             self.pipeline = pipeline(
@@ -223,11 +223,11 @@ class HuggingFaceModel:
                 trust_remote_code=True,
                 device_map="auto",
                 torch_dtype=torch.bfloat16,
-                model_kwargs={**(model_kwargs or {}), "config": config},
+                model_kwargs=model_kwargs,
             )
         except:
             self.pipeline = None
-            self.model = AutoModelForCausalLM.from_pretrained(name_or_path, config=config, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16)
+            self.model = AutoModelForCausalLM.from_pretrained(name_or_path, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16)
             
         self.generation_kwargs = generation_kwargs
         self.stop = self.generation_kwargs.pop('stop')
