@@ -208,8 +208,8 @@ class HuggingFaceModel:
         if 'Yarn-Llama' in name_or_path:
             model_kwargs = None
         else:
-            model_kwargs = {"attn_implementation": "flash_attention_2"}
-        
+            model_kwargs = {"attn_implementation": "flash_attention_2", "tp_plan": None}
+
         try:
             self.pipeline = pipeline(
                 "text-generation",
@@ -222,7 +222,7 @@ class HuggingFaceModel:
             )
         except:
             self.pipeline = None
-            self.model = AutoModelForCausalLM.from_pretrained(name_or_path, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16,)
+            self.model = AutoModelForCausalLM.from_pretrained(name_or_path, trust_remote_code=True, device_map="auto", torch_dtype=torch.bfloat16, tp_plan=None)
             
         self.generation_kwargs = generation_kwargs
         self.stop = self.generation_kwargs.pop('stop')
