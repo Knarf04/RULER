@@ -52,6 +52,7 @@ SERVER_TYPES = (
     'gemini',
     'hf',
     'mamba',
+    'mamba_fms',
     'fms',
 )
 
