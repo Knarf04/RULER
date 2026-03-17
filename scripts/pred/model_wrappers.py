@@ -279,7 +279,7 @@ class FMSModel:
                 **self.generation_kwargs
             )
             self.profiler.record_total_end()
-                self.profiler.summarize()
+            self.profiler.summarize()
             generated_texts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
         else:
             output = self.pipeline(text_inputs=prompts, **self.generation_kwargs, )
