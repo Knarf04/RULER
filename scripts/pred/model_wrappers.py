@@ -234,6 +234,17 @@ class FMSModel:
         self.profiler = CudaEventProfiler(self.model)
         self._trace_collected = False
 
+        # Warmup CUPTI on the main thread so the PyTorch profiler can be used
+        # from worker threads without the "External init callback must run in
+        # same thread as registerClient" error.
+        with torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ],
+        ):
+            torch.cuda.synchronize()
+
     def __call__(self, prompt: str, **kwargs) -> dict:
         return self.process_batch([prompt], **kwargs)[0]
 
