@@ -252,13 +252,15 @@ class FMSModel:
         if self.pipeline is None:
             inputs = self.tokenizer(prompts, return_tensors="pt", padding=True).to(self.model.device)
 
-            # PyTorch profiler: collect trace for the first generation request only
+            # PyTorch profiler: collect trace for the first request (prefill + 5 decode steps)
             if not self._trace_collected:
                 self._trace_collected = True
                 seq_len = inputs["input_ids"].shape[1]
                 trace_dir = "/gpfs/hshen/traces/ua"
                 os.makedirs(trace_dir, exist_ok=True)
                 trace_path = os.path.join(trace_dir, f"trace_seqlen{seq_len}.json")
+
+                profile_kwargs = {**self.generation_kwargs, "max_new_tokens": 5}
                 with torch.profiler.profile(
                     activities=[
                         torch.profiler.ProfilerActivity.CPU,
@@ -268,22 +270,17 @@ class FMSModel:
                     profile_memory=True,
                     with_stack=True,
                 ) as prof:
-                    self.profiler.record_total_start()
-                    generated_ids = self.model.generate(
-                        **inputs,
-                        **self.generation_kwargs
-                    )
-                    self.profiler.record_total_end()
+                    self.model.generate(**inputs, **profile_kwargs)
                 prof.export_chrome_trace(trace_path)
                 print(f"[PyTorch Profiler] Trace saved to {trace_path}")
-                self.profiler.summarize()
-            else:
-                self.profiler.record_total_start()
-                generated_ids = self.model.generate(
-                    **inputs,
-                    **self.generation_kwargs
-                )
-                self.profiler.record_total_end()
+
+            # Full generation for actual results
+            self.profiler.record_total_start()
+            generated_ids = self.model.generate(
+                **inputs,
+                **self.generation_kwargs
+            )
+            self.profiler.record_total_end()
                 self.profiler.summarize()
             generated_texts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
         else:
