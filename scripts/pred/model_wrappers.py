@@ -267,8 +267,6 @@ class FMSModel:
                         torch.profiler.ProfilerActivity.CUDA,
                     ],
                     record_shapes=True,
-                    profile_memory=True,
-                    with_stack=True,
                 ) as prof:
                     self.model.generate(**inputs, **profile_kwargs)
                 prof.export_chrome_trace(trace_path)
