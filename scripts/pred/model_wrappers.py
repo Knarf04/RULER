@@ -20,6 +20,78 @@ import torch
 from typing import Dict, List, Optional
 from torch import distributed as dist
 
+
+class CudaEventProfiler:
+    """Profiles attention vs MLP time using CUDA events on FMS LLaMA modules."""
+
+    def __init__(self, model):
+        self.events = []  # (tag, start_event, end_event)
+        self.total_start = None
+        self.total_end = None
+        self.hooks = []
+        self._instrument(model)
+
+    def _instrument(self, model):
+        for name, module in model.named_modules():
+            cls = type(module).__name__
+            if cls == "MultiHeadAttention":
+                tag = "attn"
+            elif cls == "GatedLinearUnit":
+                tag = "mlp"
+            else:
+                continue
+            self._add_hooks(module, tag)
+
+    def _add_hooks(self, module, tag):
+        start_evt = [None]
+
+        def pre_hook(mod, inp):
+            s = torch.cuda.Event(enable_timing=True)
+            s.record()
+            start_evt[0] = s
+
+        def post_hook(mod, inp, out):
+            e = torch.cuda.Event(enable_timing=True)
+            e.record()
+            self.events.append((tag, start_evt[0], e))
+
+        self.hooks.append(module.register_forward_pre_hook(pre_hook))
+        self.hooks.append(module.register_forward_hook(post_hook))
+
+    def record_total_start(self):
+        self.events.clear()
+        self.total_start = torch.cuda.Event(enable_timing=True)
+        self.total_start.record()
+
+    def record_total_end(self):
+        self.total_end = torch.cuda.Event(enable_timing=True)
+        self.total_end.record()
+
+    def summarize(self):
+        torch.cuda.synchronize()
+        attn_ms = sum(s.elapsed_time(e) for tag, s, e in self.events if tag == "attn")
+        mlp_ms = sum(s.elapsed_time(e) for tag, s, e in self.events if tag == "mlp")
+        total_ms = self.total_start.elapsed_time(self.total_end) if self.total_start and self.total_end else 0
+        other_ms = total_ms - attn_ms - mlp_ms
+
+        n_attn = sum(1 for tag, _, _ in self.events if tag == "attn")
+        n_mlp = sum(1 for tag, _, _ in self.events if tag == "mlp")
+
+        print(f"[Profiler] Total: {total_ms:.1f} ms | "
+              f"Attn: {attn_ms:.1f} ms ({n_attn} calls) | "
+              f"MLP: {mlp_ms:.1f} ms ({n_mlp} calls) | "
+              f"Other (embed+lmhead+norm+residual): {other_ms:.1f} ms")
+        if total_ms > 0:
+            print(f"[Profiler] Attn: {attn_ms/total_ms*100:.1f}% | "
+                  f"MLP: {mlp_ms/total_ms*100:.1f}% | "
+                  f"Other: {other_ms/total_ms*100:.1f}%")
+
+    def remove(self):
+        for h in self.hooks:
+            h.remove()
+        self.hooks.clear()
+
+
 class FMSModel:
     def __init__(self, name_or_path: str, variant: str, **generation_kwargs) -> None:
         from transformers import AutoTokenizer, pipeline
@@ -159,6 +231,7 @@ class FMSModel:
             self.tokenizer.pad_token = self.tokenizer.eos_token
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
 
+        self.profiler = CudaEventProfiler(self.model)
 
     def __call__(self, prompt: str, **kwargs) -> dict:
         return self.process_batch([prompt], **kwargs)[0]
@@ -166,10 +239,13 @@ class FMSModel:
     def process_batch(self, prompts: List[str], **kwargs) -> List[dict]:
         if self.pipeline is None:
             inputs = self.tokenizer(prompts, return_tensors="pt", padding=True).to(self.model.device)
+            self.profiler.record_total_start()
             generated_ids = self.model.generate(
                 **inputs,
                 **self.generation_kwargs
             )
+            self.profiler.record_total_end()
+            self.profiler.summarize()
             generated_texts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
         else:
             output = self.pipeline(text_inputs=prompts, **self.generation_kwargs, )
