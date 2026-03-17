@@ -208,7 +208,20 @@ def get_llm(tokens_to_generate):
             stop=args.stop_words,
             max_new_tokens=tokens_to_generate,
         )
-        
+
+    elif args.server_type == 'mamba_fms':
+        from model_wrappers import MambaModel
+        llm = MambaModel(
+            name_or_path=args.model_name_or_path,
+            variant=args.fms_variant,
+            repetition_penalty=1,
+            temperature=args.temperature,
+            top_k=args.top_k,
+            top_p=args.top_p,
+            stop=args.stop_words,
+            max_new_tokens=tokens_to_generate,
+        )
+
     else:
         raise RuntimeError(f'Unsupported server type {args.server_type}')
 

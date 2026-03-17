@@ -25,7 +25,7 @@ fi
 # Root Directories
 ROOT_DIR="/gpfs/hshen/RULER" # the path that stores generated task samples and model predictions.
 ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-LLM.
-MODEL_NAME="custom-hf"
+MODEL_NAME="custom-mamba-fms"
 FMS_NAME=${1} # FMS configuration name
 DISPLAY_NAME=${2}
 MODEL_DIR=${3} # the path that contains individual model folders from Huggingface.

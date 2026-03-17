@@ -275,13 +275,43 @@ class HuggingFaceModel:
 
 
 class MambaModel:
-    def __init__(self, name_or_path: str, **generation_kwargs) -> None:
+    def __init__(self, name_or_path: str, variant: str = None, **generation_kwargs) -> None:
         from transformers import AutoTokenizer
         from mamba_ssm.models.mixer_seq_simple import MambaLMHeadModel
 
-        self.tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b")
         self.device = "cuda"
-        self.model = MambaLMHeadModel.from_pretrained(name_or_path, device=self.device, dtype=torch.bfloat16)
+
+        if variant is not None:
+            # FMS checkpoint loading path (same pattern as GDN in FMSModel)
+            from mamba_ssm.models.config_mamba import MambaConfig
+            from fms_fsdp.utils.config_utils import get_model_config
+            from torch.distributed._shard.checkpoint import FileSystemReader, load
+
+            tokenizer_path = os.path.dirname(name_or_path) if os.path.isfile(name_or_path) else name_or_path
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, trust_remote_code=True)
+
+            config_data = get_model_config(variant)
+            config = MambaConfig(**config_data)
+            self.model = MambaLMHeadModel(config)
+
+            print(f"Reading state dict from {name_or_path}")
+            if name_or_path.endswith('.pth'):
+                ckpt = torch.load(name_or_path, map_location="cpu")
+                self.model.load_state_dict(ckpt["model_state"])
+            else:
+                state_dict = {"model_state": self.model.state_dict()}
+                load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
+                self.model.load_state_dict(state_dict["model_state"])
+
+            print("Loading state dict into the model...")
+            self.model.to(dtype=torch.bfloat16, device=self.device)
+        else:
+            # Original HF-pretrained loading path
+            self.tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b")
+            self.model = MambaLMHeadModel.from_pretrained(name_or_path, device=self.device, dtype=torch.bfloat16)
+
+        self.model.eval()
+        torch.set_grad_enabled(False)
         self.generation_kwargs = generation_kwargs
         self.stop = self.generation_kwargs.pop('stop')
         self.max_genlen = self.generation_kwargs.pop('max_new_tokens')

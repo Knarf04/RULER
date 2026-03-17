@@ -118,6 +118,11 @@ MODEL_SELECT() {
             MODEL_TEMPLATE_TYPE="base"
             MODEL_FRAMEWORK="fms"
             ;;
+        custom-mamba-fms)
+            MODEL_PATH="${MODEL_DIR}"
+            MODEL_TEMPLATE_TYPE="base"
+            MODEL_FRAMEWORK="mamba_fms"
+            ;;
     esac
 
 
