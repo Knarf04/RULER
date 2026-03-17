@@ -232,6 +232,7 @@ class FMSModel:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
 
         self.profiler = CudaEventProfiler(self.model)
+        self._trace_collected = False
 
     def __call__(self, prompt: str, **kwargs) -> dict:
         return self.process_batch([prompt], **kwargs)[0]
@@ -239,13 +240,40 @@ class FMSModel:
     def process_batch(self, prompts: List[str], **kwargs) -> List[dict]:
         if self.pipeline is None:
             inputs = self.tokenizer(prompts, return_tensors="pt", padding=True).to(self.model.device)
-            self.profiler.record_total_start()
-            generated_ids = self.model.generate(
-                **inputs,
-                **self.generation_kwargs
-            )
-            self.profiler.record_total_end()
-            self.profiler.summarize()
+
+            # PyTorch profiler: collect trace for the first generation request only
+            if not self._trace_collected:
+                self._trace_collected = True
+                seq_len = inputs["input_ids"].shape[1]
+                trace_dir = "/gpfs/hshen/traces/ua"
+                os.makedirs(trace_dir, exist_ok=True)
+                trace_path = os.path.join(trace_dir, f"trace_seqlen{seq_len}.json")
+                with torch.profiler.profile(
+                    activities=[
+                        torch.profiler.ProfilerActivity.CPU,
+                        torch.profiler.ProfilerActivity.CUDA,
+                    ],
+                    record_shapes=True,
+                    profile_memory=True,
+                    with_stack=True,
+                ) as prof:
+                    self.profiler.record_total_start()
+                    generated_ids = self.model.generate(
+                        **inputs,
+                        **self.generation_kwargs
+                    )
+                    self.profiler.record_total_end()
+                prof.export_chrome_trace(trace_path)
+                print(f"[PyTorch Profiler] Trace saved to {trace_path}")
+                self.profiler.summarize()
+            else:
+                self.profiler.record_total_start()
+                generated_ids = self.model.generate(
+                    **inputs,
+                    **self.generation_kwargs
+                )
+                self.profiler.record_total_end()
+                self.profiler.summarize()
             generated_texts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
         else:
             output = self.pipeline(text_inputs=prompts, **self.generation_kwargs, )
