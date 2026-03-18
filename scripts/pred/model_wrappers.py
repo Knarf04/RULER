@@ -320,6 +320,10 @@ class MambaModel:
         self.stop = self.generation_kwargs.pop('stop')
         self.max_genlen = self.generation_kwargs.pop('max_new_tokens')
         self.minp = 0.0
+        # temperature=0 with top_k>1 causes div-by-zero; use top_k=1 for greedy
+        if self.generation_kwargs.get('temperature', 1.0) == 0.0:
+            self.generation_kwargs['temperature'] = 1.0
+            self.generation_kwargs['top_k'] = 1
 
     def __call__(self, prompt: str, **kwargs) -> Dict[str, List[str]]:
         # tokenize
