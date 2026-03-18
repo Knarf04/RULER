@@ -44,7 +44,7 @@ try:
     _orig_bench = Autotuner._bench
     def _patched_bench(self, *args, config, **kwargs):
         if self.nargs is None:
-            self.nargs = {}
+            self.nargs = dict(zip(self.arg_names, args))
         return _orig_bench(self, *args, config=config, **kwargs)
     Autotuner._bench = _patched_bench
 except Exception:
