@@ -38,13 +38,13 @@ import sys
 import threading
 import importlib
 
-# Patch Triton 3.1.0 autotuner NoneType bug in _bench
+# Patch Triton 3.1.0 autotuner NoneType bug — self.nargs can be None
 try:
     from triton.runtime.autotuner import Autotuner
     _orig_bench = Autotuner._bench
     def _patched_bench(self, *args, config, **kwargs):
-        if config is None or getattr(config, 'kwargs', None) is None:
-            return float('inf')
+        if self.nargs is None:
+            self.nargs = {}
         return _orig_bench(self, *args, config=config, **kwargs)
     Autotuner._bench = _patched_bench
 except Exception:
