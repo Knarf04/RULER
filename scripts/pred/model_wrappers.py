@@ -20,6 +20,10 @@ import torch
 from typing import Dict, List, Optional
 from torch import distributed as dist
 
+def _strip_compiled_prefix(sd):
+    prefix = "_orig_mod."
+    return {k[len(prefix):] if k.startswith(prefix) else k: v for k, v in sd.items()}
+
 class FMSModel:
     def __init__(self, name_or_path: str, variant: str, **generation_kwargs) -> None:
         from transformers import AutoTokenizer, pipeline
@@ -68,12 +72,12 @@ class FMSModel:
                 # Single-file checkpoint saved by save_single_file()
                 # Format: {"step": ..., "model_state": state_dict, ...}
                 ckpt = torch.load(name_or_path, map_location="cpu")
-                self._fla_model.load_state_dict(ckpt["model_state"])
+                self._fla_model.load_state_dict(_strip_compiled_prefix(ckpt["model_state"]))
             else:
                 # Distributed checkpoint (FSDP2 sharded)
                 state_dict = {"model_state": self._fla_model.state_dict()}
                 load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
-                self._fla_model.load_state_dict(state_dict["model_state"])
+                self._fla_model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
 
             print("Loading state dict into the model...")
             self._fla_model.to(dtype=torch.bfloat16, device='cuda')
@@ -84,11 +88,11 @@ class FMSModel:
             print(f"Reading state dict from {name_or_path}")
             if name_or_path.endswith('.pth'):
                 ckpt = torch.load(name_or_path, map_location="cpu")
-                self._fms_model.load_state_dict(ckpt["model_state"])
+                self._fms_model.load_state_dict(_strip_compiled_prefix(ckpt["model_state"]))
             else:
                 state_dict = {"model_state": self._fms_model.state_dict()}
                 load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
-                self._fms_model.load_state_dict(state_dict["model_state"])
+                self._fms_model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
 
             print("Loading state dict into the model...")
             self._fms_model.to(dtype=torch.bfloat16, device='cuda')
@@ -293,10 +297,6 @@ class MambaModel:
             config_data = get_model_config(variant)
             config = MambaConfig(**config_data)
             self.model = MambaLMHeadModel(config)
-
-            def _strip_compiled_prefix(sd):
-                prefix = "_orig_mod."
-                return {k[len(prefix):] if k.startswith(prefix) else k: v for k, v in sd.items()}
 
             print(f"Reading state dict from {name_or_path}")
             if name_or_path.endswith('.pth'):
