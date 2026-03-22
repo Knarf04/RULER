@@ -26,6 +26,11 @@ def _strip_compiled_prefix(sd):
 
 class FMSModel:
     def __init__(self, name_or_path: str, variant: str, **generation_kwargs) -> None:
+        # Enable MiniKV cache eviction logging
+        logging.basicConfig(level=logging.WARNING)
+        for _log_name in ("fms.models.llama", "fms.utils.minikv"):
+            logging.getLogger(_log_name).setLevel(logging.INFO)
+
         from transformers import AutoTokenizer, pipeline
         from fms.models import get_model
         from fms import models
