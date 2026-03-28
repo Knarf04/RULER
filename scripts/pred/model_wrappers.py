@@ -39,6 +39,7 @@ class FMSModel:
         accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
         self.accelerator = accelerator
         self.device = accelerator.device
+        torch.cuda.set_device(self.device)
 
         from transformers import AutoTokenizer, pipeline
         from fms.models import get_model
@@ -303,6 +304,7 @@ class MambaModel:
         accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
         self.accelerator = accelerator
         self.device = accelerator.device
+        torch.cuda.set_device(self.device)
 
         if variant is not None:
             # FMS checkpoint loading path — load on CPU, then move to device

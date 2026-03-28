@@ -251,6 +251,12 @@ def get_llm(tokens_to_generate):
 def main():
     start_time = time.time()
 
+    # Restrict each rank to its own GPU before any CUDA init.
+    # This makes every rank see only cuda:0 (its own physical GPU).
+    if args.use_accelerate:
+        local_rank = int(os.environ.get('LOCAL_RANK', 0))
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(local_rank)
+
     curr_folder = os.path.dirname(os.path.abspath(__file__))
 
     try:
