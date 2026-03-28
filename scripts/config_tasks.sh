@@ -44,3 +44,9 @@ synthetic=(
     "qa_1"
     "qa_2"
 )
+
+niah_single=(
+    "niah_single_1"
+    "niah_single_2"
+    "niah_single_3"
+)
