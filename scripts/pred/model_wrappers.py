@@ -25,14 +25,19 @@ def _strip_compiled_prefix(sd):
     return {k[len(prefix):] if k.startswith(prefix) else k: v for k, v in sd.items()}
 
 class FMSModel:
-    def __init__(self, name_or_path: str, variant: str, accelerator=None, tokenizer_path=None, **generation_kwargs) -> None:
+    def __init__(self, name_or_path: str, variant: str, tokenizer_path=None, **generation_kwargs) -> None:
         # Enable MiniKV cache eviction logging
         logging.basicConfig(level=logging.WARNING)
         for _log_name in ("fms.models.llama", "fms.utils.minikv"):
             logging.getLogger(_log_name).setLevel(logging.INFO)
 
-        # Data parallel via accelerate: each rank places model on its own GPU
-        self.device = str(accelerator.device) if accelerator is not None else "cuda"
+        # Replicate lm_eval_harness device setup (huggingface.py:132-133)
+        from accelerate import Accelerator
+        from accelerate.utils import InitProcessGroupKwargs
+        from datetime import timedelta
+        accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
+        accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
+        self.device = accelerator.device
 
         from transformers import AutoTokenizer, pipeline
         from fms.models import get_model
@@ -73,28 +78,22 @@ class FMSModel:
             if "src_vocab_size" in fla_config_data:
                 fla_config_data["vocab_size"] = fla_config_data.pop("src_vocab_size")
             fla_config = FLAGDNConfig(**fla_config_data)
-            # Initialize and move to target device before any forward pass
-            # to avoid Triton autotuner hitting CPU tensors
             self._fla_model = GatedDeltaNetForCausalLM(fla_config)
-            self._fla_model.to(dtype=torch.bfloat16, device=self.device)
             print(f'{self._fla_model=}')
 
             print(f"Reading state dict from {name_or_path}")
             if name_or_path.endswith('.pth'):
-                # Single-file checkpoint saved by save_single_file()
-                # Format: {"step": ..., "model_state": state_dict, ...}
                 ckpt = torch.load(name_or_path, map_location="cpu")
                 self._fla_model.load_state_dict(_strip_compiled_prefix(ckpt["model_state"]))
             else:
-                # Distributed checkpoint (FSDP2 sharded)
                 state_dict = {"model_state": self._fla_model.state_dict()}
                 load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
                 self._fla_model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
+
+            print("Loading state dict into the model...")
+            self._fla_model.to(self.device, dtype=torch.bfloat16)
         else:
-            # Initialize and move to target device before any forward pass
-            # to avoid Triton autotuner hitting CPU tensors
             self._fms_model = LLaMA(_config_data)
-            self._fms_model.to(dtype=torch.bfloat16, device=self.device)
             print(f'{self._fms_model=}')
 
             print(f"Reading state dict from {name_or_path}")
@@ -105,6 +104,9 @@ class FMSModel:
                 state_dict = {"model_state": self._fms_model.state_dict()}
                 load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
                 self._fms_model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
+
+            print("Loading state dict into the model...")
+            self._fms_model.to(self.device, dtype=torch.bfloat16)
         # Disable 'tp' for universal attention, put *.pth
         # self._fms_model = get_model(
         #     _architecture_name,
@@ -288,15 +290,21 @@ class HuggingFaceModel:
 
 
 class MambaModel:
-    def __init__(self, name_or_path: str, variant: str = None, accelerator=None, tokenizer_path=None, **generation_kwargs) -> None:
+    def __init__(self, name_or_path: str, variant: str = None, tokenizer_path=None, **generation_kwargs) -> None:
         from transformers import AutoTokenizer
         from mamba_ssm.models.mixer_seq_simple import MambaLMHeadModel
 
-        # Data parallel via accelerate: each rank places model on its own GPU
-        self.device = str(accelerator.device) if accelerator is not None else "cuda"
+        # Replicate lm_eval_harness device setup (huggingface.py:132-133)
+        from accelerate import Accelerator
+        from accelerate.utils import InitProcessGroupKwargs
+        from datetime import timedelta
+        accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
+        accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
+        self.device = accelerator.device
 
         if variant is not None:
-            # FMS checkpoint loading path (same pattern as GDN in FMSModel)
+            # FMS checkpoint loading path — load on CPU, then move to device
+            # (replicates lm_eval mamba_lm.py:_load_fms_checkpoint + _create_model)
             from mamba_ssm.models.config_mamba import MambaConfig
             from fms_fsdp.utils.config_utils import get_model_config
             from torch.distributed._shard.checkpoint import FileSystemReader, load
@@ -307,9 +315,7 @@ class MambaModel:
 
             config_data = get_model_config(variant)
             config = MambaConfig(**config_data)
-            # Initialize directly on target device to avoid Triton autotuner
-            # hitting CPU tensors during the first forward pass
-            self.model = MambaLMHeadModel(config, device=self.device, dtype=torch.bfloat16)
+            self.model = MambaLMHeadModel(config)
 
             print(f"Reading state dict from {name_or_path}")
             if name_or_path.endswith('.pth'):
@@ -319,6 +325,9 @@ class MambaModel:
                 state_dict = {"model_state": self.model.state_dict()}
                 load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
                 self.model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
+
+            print("Loading state dict into the model...")
+            self.model.to(self.device, dtype=torch.bfloat16)
         else:
             # Original HF-pretrained loading path
             self.tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b")

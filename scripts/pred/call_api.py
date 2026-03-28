@@ -114,7 +114,7 @@ if args.server_type == 'hf' or args.server_type == 'gemini' or args.server_type 
     args.threads = 1
 
 
-def get_llm(tokens_to_generate, accelerator=None):
+def get_llm(tokens_to_generate):
     if args.server_type == 'trtllm':
         from client_wrappers import TRTLLMClient
         llm = TRTLLMClient(
@@ -203,7 +203,6 @@ def get_llm(tokens_to_generate, accelerator=None):
         llm = FMSModel(
             name_or_path=args.model_name_or_path,
             variant=args.fms_variant,
-            accelerator=accelerator,
             tokenizer_path=args.tokenizer_path,
             do_sample=args.temperature > 0,
             repetition_penalty=1,
@@ -220,7 +219,6 @@ def get_llm(tokens_to_generate, accelerator=None):
         # https://github.com/state-spaces/mamba/blob/009bec5ee37f586844a3fc89c040a9c1a9d8badf/mamba_ssm/utils/generation.py#L121
         llm = MambaModel(
             name_or_path=args.model_name_or_path,
-            accelerator=accelerator,
             tokenizer_path=args.tokenizer_path,
             repetition_penalty=1,
             temperature=args.temperature,
@@ -235,7 +233,6 @@ def get_llm(tokens_to_generate, accelerator=None):
         llm = MambaModel(
             name_or_path=args.model_name_or_path,
             variant=args.fms_variant,
-            accelerator=accelerator,
             tokenizer_path=args.tokenizer_path,
             repetition_penalty=1,
             temperature=args.temperature,
@@ -307,7 +304,7 @@ def main():
         write_file = pred_file
 
     # Load api
-    llm = get_llm(config['tokens_to_generate'], accelerator=accelerator)
+    llm = get_llm(config['tokens_to_generate'])
 
     def get_output(idx_list, index_list, input_list, outputs_list, others_list, truncation_list, length_list):
         nonlocal llm
