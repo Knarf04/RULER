@@ -73,7 +73,10 @@ class FMSModel:
             if "src_vocab_size" in fla_config_data:
                 fla_config_data["vocab_size"] = fla_config_data.pop("src_vocab_size")
             fla_config = FLAGDNConfig(**fla_config_data)
+            # Initialize and move to target device before any forward pass
+            # to avoid Triton autotuner hitting CPU tensors
             self._fla_model = GatedDeltaNetForCausalLM(fla_config)
+            self._fla_model.to(dtype=torch.bfloat16, device=self.device)
             print(f'{self._fla_model=}')
 
             print(f"Reading state dict from {name_or_path}")
@@ -87,11 +90,11 @@ class FMSModel:
                 state_dict = {"model_state": self._fla_model.state_dict()}
                 load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
                 self._fla_model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
-
-            print("Loading state dict into the model...")
-            self._fla_model.to(dtype=torch.bfloat16, device=self.device)
         else:
+            # Initialize and move to target device before any forward pass
+            # to avoid Triton autotuner hitting CPU tensors
             self._fms_model = LLaMA(_config_data)
+            self._fms_model.to(dtype=torch.bfloat16, device=self.device)
             print(f'{self._fms_model=}')
 
             print(f"Reading state dict from {name_or_path}")
@@ -102,9 +105,6 @@ class FMSModel:
                 state_dict = {"model_state": self._fms_model.state_dict()}
                 load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
                 self._fms_model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
-
-            print("Loading state dict into the model...")
-            self._fms_model.to(dtype=torch.bfloat16, device=self.device)
         # Disable 'tp' for universal attention, put *.pth
         # self._fms_model = get_model(
         #     _architecture_name,
@@ -307,7 +307,9 @@ class MambaModel:
 
             config_data = get_model_config(variant)
             config = MambaConfig(**config_data)
-            self.model = MambaLMHeadModel(config)
+            # Initialize directly on target device to avoid Triton autotuner
+            # hitting CPU tensors during the first forward pass
+            self.model = MambaLMHeadModel(config, device=self.device, dtype=torch.bfloat16)
 
             print(f"Reading state dict from {name_or_path}")
             if name_or_path.endswith('.pth'):
@@ -317,9 +319,6 @@ class MambaModel:
                 state_dict = {"model_state": self.model.state_dict()}
                 load(state_dict=state_dict, storage_reader=FileSystemReader(name_or_path))
                 self.model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
-
-            print("Loading state dict into the model...")
-            self.model.to(dtype=torch.bfloat16, device=self.device)
         else:
             # Original HF-pretrained loading path
             self.tokenizer = AutoTokenizer.from_pretrained("EleutherAI/gpt-neox-20b")
