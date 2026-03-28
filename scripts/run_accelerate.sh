@@ -18,7 +18,7 @@
 
 if [ $# -ne 8 ]; then
     echo "Usage: $0 <model_type> <fms_name> <disp_name> <model_directory> <tokenizer_type> <benchmark_name> <sequence_length> <batch_size>"
-    echo "  model_type: fms or mamba"
+    echo "  model_type: fms or mamba_ssm"
     exit 1
 fi
 
@@ -29,10 +29,10 @@ ENGINE_DIR="." # the path that contains individual engine folders from TensorRT-
 MODEL_TYPE=${1} # fms or mamba
 if [ "${MODEL_TYPE}" == "fms" ]; then
     MODEL_NAME="custom-fms"
-elif [ "${MODEL_TYPE}" == "mamba" ]; then
+elif [ "${MODEL_TYPE}" == "mamba_ssm" ]; then
     MODEL_NAME="custom-mamba-fms"
 else
-    echo "Error: model_type must be 'fms' or 'mamba', got '${MODEL_TYPE}'"
+    echo "Error: model_type must be 'fms' or 'mamba_ssm', got '${MODEL_TYPE}'"
     exit 1
 fi
 FMS_NAME=${2} # FMS configuration name
