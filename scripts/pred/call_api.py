@@ -90,8 +90,10 @@ parser.add_argument("--server_host", type=str, default='127.0.0.1')
 parser.add_argument("--server_port", type=str, default='5000')
 parser.add_argument("--ssh_server", type=str)
 parser.add_argument("--ssh_key_path", type=str)
-parser.add_argument("--model_name_or_path", type=str, default='gpt-3.5-turbo', 
+parser.add_argument("--model_name_or_path", type=str, default='gpt-3.5-turbo',
                     help='supported models from OpenAI or HF (provide a key or a local path to the checkpoint)')
+parser.add_argument("--tokenizer_path", type=str, default=None,
+                    help='explicit tokenizer path (overrides auto-detection from model path)')
 
 # Inference
 parser.add_argument("--fms_variant", type=str, default='llama_1b', help='provide the variant such as llama_1b, mamba_9.8b')
@@ -202,6 +204,7 @@ def get_llm(tokens_to_generate, accelerator=None):
             name_or_path=args.model_name_or_path,
             variant=args.fms_variant,
             accelerator=accelerator,
+            tokenizer_path=args.tokenizer_path,
             do_sample=args.temperature > 0,
             repetition_penalty=1,
             temperature=args.temperature,
@@ -218,6 +221,7 @@ def get_llm(tokens_to_generate, accelerator=None):
         llm = MambaModel(
             name_or_path=args.model_name_or_path,
             accelerator=accelerator,
+            tokenizer_path=args.tokenizer_path,
             repetition_penalty=1,
             temperature=args.temperature,
             top_k=args.top_k,
@@ -232,6 +236,7 @@ def get_llm(tokens_to_generate, accelerator=None):
             name_or_path=args.model_name_or_path,
             variant=args.fms_variant,
             accelerator=accelerator,
+            tokenizer_path=args.tokenizer_path,
             repetition_penalty=1,
             temperature=args.temperature,
             top_k=args.top_k,

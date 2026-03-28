@@ -47,11 +47,14 @@ GPUS=${GPUS:-8} # default to all 8 GPUs; override with GPUS=N
 # Model and Tokenizer
 source config_models.sh
 MODEL_CONFIG=$(MODEL_SELECT ${MODEL_NAME} ${MODEL_DIR} ${ENGINE_DIR})
-IFS=":" read MODEL_PATH MODEL_TEMPLATE_TYPE MODEL_FRAMEWORK TOKENIZER_PATH TOKENIZER_TYPE OPENAI_API_KEY GEMINI_API_KEY AZURE_ID AZURE_SECRET AZURE_ENDPOINT <<< "$MODEL_CONFIG"
+IFS=":" read MODEL_PATH MODEL_TEMPLATE_TYPE MODEL_FRAMEWORK _TOKENIZER_PATH TOKENIZER_TYPE OPENAI_API_KEY GEMINI_API_KEY AZURE_ID AZURE_SECRET AZURE_ENDPOINT <<< "$MODEL_CONFIG"
 if [ -z "${MODEL_PATH}" ]; then
     echo "Model: ${MODEL_NAME} is not supported"
     exit 1
 fi
+
+# Use explicit tokenizer path instead of auto-detected one
+TOKENIZER_PATH="/gpfs/hshen/tokenizer/${TOKENIZER}"
 
 
 export OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -69,21 +72,26 @@ if [ -z "${TASKS}" ]; then
     exit 1
 fi
 
+# Resolve the actual data benchmark (e.g. niah_single -> synthetic)
+# Subsets define <name>_benchmark in config_tasks.sh; fall back to BENCHMARK itself
+BENCHMARK_VAR="${BENCHMARK}_benchmark"
+DATA_BENCHMARK=${!BENCHMARK_VAR:-$BENCHMARK}
+
 # Start client (prepare data / call model API / obtain final metrics)
 total_time=0
 for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
 
     # Modified the data generation logic here: make the generation consistent for all models
-    DATA_DIR="${ROOT_DIR}/data/${TOKENIZER}/${BENCHMARK}/${MAX_SEQ_LENGTH}"
-    # DATA_DIR="${ROOT_DIR}/data_dliu/${TOKENIZER}/${BENCHMARK}/${MAX_SEQ_LENGTH}"
+    DATA_DIR="${ROOT_DIR}/data/${TOKENIZER}/${DATA_BENCHMARK}/${MAX_SEQ_LENGTH}"
+    # DATA_DIR="${ROOT_DIR}/data_dliu/${TOKENIZER}/${DATA_BENCHMARK}/${MAX_SEQ_LENGTH}"
     PRED_DIR="${ROOT_DIR}/fms/${DISPLAY_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}/pred"
     mkdir -p ${DATA_DIR}
     mkdir -p ${PRED_DIR}
-    
+
     for TASK in "${TASKS[@]}"; do
         python data/prepare.py \
             --save_dir ${DATA_DIR} \
-            --benchmark ${BENCHMARK} \
+            --benchmark ${DATA_BENCHMARK} \
             --task ${TASK} \
             --tokenizer_path ${TOKENIZER_PATH} \
             --tokenizer_type ${TOKENIZER_TYPE} \
@@ -91,15 +99,16 @@ for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
             --model_template_type ${MODEL_TEMPLATE_TYPE} \
             --num_samples ${NUM_SAMPLES} \
             ${REMOVE_NEWLINE_TAB}
-        
+
         start_time=$(date +%s)
         accelerate launch --num_processes ${GPUS} pred/call_api.py \
             --data_dir ${DATA_DIR} \
             --save_dir ${PRED_DIR} \
-            --benchmark ${BENCHMARK} \
+            --benchmark ${DATA_BENCHMARK} \
             --task ${TASK} \
             --server_type ${MODEL_FRAMEWORK} \
             --model_name_or_path ${MODEL_PATH} \
+            --tokenizer_path ${TOKENIZER_PATH} \
             --temperature ${TEMPERATURE} \
             --top_k ${TOP_K} \
             --top_p ${TOP_P} \
@@ -111,10 +120,10 @@ for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
         time_diff=$((end_time - start_time))
         total_time=$((total_time + time_diff))
     done
-    
+
     python eval/evaluate.py \
         --data_dir ${PRED_DIR} \
-        --benchmark ${BENCHMARK}
+        --benchmark ${DATA_BENCHMARK}
 done
 
 echo "Total time spent on call_api: $total_time seconds"

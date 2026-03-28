@@ -25,7 +25,7 @@ def _strip_compiled_prefix(sd):
     return {k[len(prefix):] if k.startswith(prefix) else k: v for k, v in sd.items()}
 
 class FMSModel:
-    def __init__(self, name_or_path: str, variant: str, accelerator=None, **generation_kwargs) -> None:
+    def __init__(self, name_or_path: str, variant: str, accelerator=None, tokenizer_path=None, **generation_kwargs) -> None:
         # Enable MiniKV cache eviction logging
         logging.basicConfig(level=logging.WARNING)
         for _log_name in ("fms.models.llama", "fms.utils.minikv"):
@@ -44,7 +44,8 @@ class FMSModel:
         from fms_fsdp.utils.config_utils import get_model_config
         from fms.models.llama import _llama_factory_factory
 
-        tokenizer_path = os.path.dirname(name_or_path) if os.path.isfile(name_or_path) else name_or_path
+        if tokenizer_path is None:
+            tokenizer_path = os.path.dirname(name_or_path) if os.path.isfile(name_or_path) else name_or_path
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, trust_remote_code=True)
         _config_data = get_model_config(variant)
         _architecture_name, _variant = variant.split('_', 1)
@@ -287,7 +288,7 @@ class HuggingFaceModel:
 
 
 class MambaModel:
-    def __init__(self, name_or_path: str, variant: str = None, accelerator=None, **generation_kwargs) -> None:
+    def __init__(self, name_or_path: str, variant: str = None, accelerator=None, tokenizer_path=None, **generation_kwargs) -> None:
         from transformers import AutoTokenizer
         from mamba_ssm.models.mixer_seq_simple import MambaLMHeadModel
 
@@ -300,7 +301,8 @@ class MambaModel:
             from fms_fsdp.utils.config_utils import get_model_config
             from torch.distributed._shard.checkpoint import FileSystemReader, load
 
-            tokenizer_path = os.path.dirname(name_or_path) if os.path.isfile(name_or_path) else name_or_path
+            if tokenizer_path is None:
+                tokenizer_path = os.path.dirname(name_or_path) if os.path.isfile(name_or_path) else name_or_path
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, trust_remote_code=True)
 
             config_data = get_model_config(variant)

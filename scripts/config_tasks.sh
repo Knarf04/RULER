@@ -50,3 +50,4 @@ niah_single=(
     "niah_single_2"
     "niah_single_3"
 )
+niah_single_benchmark="synthetic"
