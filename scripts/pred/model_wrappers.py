@@ -37,6 +37,7 @@ class FMSModel:
         from datetime import timedelta
         accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
         accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
+        self.accelerator = accelerator
         self.device = accelerator.device
 
         from transformers import AutoTokenizer, pipeline
@@ -300,6 +301,7 @@ class MambaModel:
         from datetime import timedelta
         accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
         accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
+        self.accelerator = accelerator
         self.device = accelerator.device
 
         if variant is not None:
