@@ -25,11 +25,14 @@ def _strip_compiled_prefix(sd):
     return {k[len(prefix):] if k.startswith(prefix) else k: v for k, v in sd.items()}
 
 class FMSModel:
-    def __init__(self, name_or_path: str, variant: str, **generation_kwargs) -> None:
+    def __init__(self, name_or_path: str, variant: str, accelerator=None, **generation_kwargs) -> None:
         # Enable MiniKV cache eviction logging
         logging.basicConfig(level=logging.WARNING)
         for _log_name in ("fms.models.llama", "fms.utils.minikv"):
             logging.getLogger(_log_name).setLevel(logging.INFO)
+
+        # Data parallel via accelerate: each rank places model on its own GPU
+        self.device = str(accelerator.device) if accelerator is not None else "cuda"
 
         from transformers import AutoTokenizer, pipeline
         from fms.models import get_model
@@ -85,7 +88,7 @@ class FMSModel:
                 self._fla_model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
 
             print("Loading state dict into the model...")
-            self._fla_model.to(dtype=torch.bfloat16, device='cuda')
+            self._fla_model.to(dtype=torch.bfloat16, device=self.device)
         else:
             self._fms_model = LLaMA(_config_data)
             print(f'{self._fms_model=}')
@@ -100,7 +103,7 @@ class FMSModel:
                 self._fms_model.load_state_dict(_strip_compiled_prefix(state_dict["model_state"]))
 
             print("Loading state dict into the model...")
-            self._fms_model.to(dtype=torch.bfloat16, device='cuda')
+            self._fms_model.to(dtype=torch.bfloat16, device=self.device)
         # Disable 'tp' for universal attention, put *.pth
         # self._fms_model = get_model(
         #     _architecture_name,
@@ -284,11 +287,12 @@ class HuggingFaceModel:
 
 
 class MambaModel:
-    def __init__(self, name_or_path: str, variant: str = None, **generation_kwargs) -> None:
+    def __init__(self, name_or_path: str, variant: str = None, accelerator=None, **generation_kwargs) -> None:
         from transformers import AutoTokenizer
         from mamba_ssm.models.mixer_seq_simple import MambaLMHeadModel
 
-        self.device = "cuda"
+        # Data parallel via accelerate: each rank places model on its own GPU
+        self.device = str(accelerator.device) if accelerator is not None else "cuda"
 
         if variant is not None:
             # FMS checkpoint loading path (same pattern as GDN in FMSModel)

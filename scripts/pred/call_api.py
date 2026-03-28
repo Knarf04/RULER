@@ -103,6 +103,8 @@ parser.add_argument("--stop_words", type=str, default='')
 parser.add_argument("--sliding_window_size", type=int)
 parser.add_argument("--threads", type=int, default=4)
 parser.add_argument("--batch_size", type=int, default=1)
+parser.add_argument("--use_accelerate", action="store_true", default=False,
+                    help='Use accelerate for multi-GPU data parallel inference (launch with: accelerate launch)')
 
 args = parser.parse_args()
 args.stop_words = list(filter(None, args.stop_words.split(',')))
@@ -110,7 +112,7 @@ if args.server_type == 'hf' or args.server_type == 'gemini' or args.server_type 
     args.threads = 1
 
 
-def get_llm(tokens_to_generate):
+def get_llm(tokens_to_generate, accelerator=None):
     if args.server_type == 'trtllm':
         from client_wrappers import TRTLLMClient
         llm = TRTLLMClient(
@@ -199,6 +201,7 @@ def get_llm(tokens_to_generate):
         llm = FMSModel(
             name_or_path=args.model_name_or_path,
             variant=args.fms_variant,
+            accelerator=accelerator,
             do_sample=args.temperature > 0,
             repetition_penalty=1,
             temperature=args.temperature,
@@ -214,6 +217,7 @@ def get_llm(tokens_to_generate):
         # https://github.com/state-spaces/mamba/blob/009bec5ee37f586844a3fc89c040a9c1a9d8badf/mamba_ssm/utils/generation.py#L121
         llm = MambaModel(
             name_or_path=args.model_name_or_path,
+            accelerator=accelerator,
             repetition_penalty=1,
             temperature=args.temperature,
             top_k=args.top_k,
@@ -227,6 +231,7 @@ def get_llm(tokens_to_generate):
         llm = MambaModel(
             name_or_path=args.model_name_or_path,
             variant=args.fms_variant,
+            accelerator=accelerator,
             repetition_penalty=1,
             temperature=args.temperature,
             top_k=args.top_k,
@@ -243,7 +248,15 @@ def get_llm(tokens_to_generate):
 
 def main():
     start_time = time.time()
-    
+
+    # Set up accelerate for multi-GPU data parallel inference
+    accelerator = None
+    if args.use_accelerate:
+        from accelerate import Accelerator
+        accelerator = Accelerator()
+        print(f"[Rank {accelerator.process_index}/{accelerator.num_processes}] "
+              f"Data parallel inference on {accelerator.device}")
+
     curr_folder = os.path.dirname(os.path.abspath(__file__))
     
     try:
@@ -279,8 +292,17 @@ def main():
     else:
         data = read_manifest(task_file)
 
+    # Split data across accelerate ranks (interleaved for balance)
+    use_multi_gpu = accelerator is not None and accelerator.num_processes > 1
+    if use_multi_gpu:
+        data = data[accelerator.process_index::accelerator.num_processes]
+        write_file = pred_file.parent / f'{pred_file.stem}-rank{accelerator.process_index}.jsonl'
+        print(f"[Rank {accelerator.process_index}] Processing {len(data)} samples -> {write_file}")
+    else:
+        write_file = pred_file
+
     # Load api
-    llm = get_llm(config['tokens_to_generate'])
+    llm = get_llm(config['tokens_to_generate'], accelerator=accelerator)
 
     def get_output(idx_list, index_list, input_list, outputs_list, others_list, truncation_list, length_list):
         nonlocal llm
@@ -331,7 +353,7 @@ def main():
         batched_data.append(batch)
 
     # setting buffering=1 to force to dump the output after every line, so that we can see intermediate generations
-    with open(pred_file, 'at', encoding="utf-8", buffering=1) as fout:
+    with open(write_file, 'at', encoding="utf-8", buffering=1) as fout:
         # the data is processed sequentially, so we can store the start and end of current processing window
         start_idx = 0  # window: [start_idx, end_idx]
 
@@ -367,6 +389,31 @@ def main():
                         fout.write(json.dumps(outputs_parallel[idx]) + '\n')
 
                 start_idx = end_idx + 1
+
+    # Merge per-rank files into the final prediction file
+    if use_multi_gpu:
+        accelerator.wait_for_everyone()
+        if accelerator.is_main_process:
+            all_preds = []
+            for i in range(accelerator.num_processes):
+                rank_file = pred_file.parent / f'{pred_file.stem}-rank{i}.jsonl'
+                if rank_file.exists():
+                    with open(rank_file) as fin:
+                        for line in fin:
+                            if line.strip():
+                                all_preds.append(json.loads(line))
+                    rank_file.unlink()
+            # Include any existing predictions (from prior/resumed runs)
+            if pred_file.exists():
+                with open(pred_file) as fin:
+                    for line in fin:
+                        if line.strip():
+                            all_preds.append(json.loads(line))
+            all_preds.sort(key=lambda x: x['index'])
+            with open(pred_file, 'w') as fout:
+                for p in all_preds:
+                    fout.write(json.dumps(p) + '\n')
+            print(f"Merged {len(all_preds)} predictions into {pred_file}")
 
     print(f"Used time: {round((time.time() - start_time) / 60, 1)} minutes")
 
