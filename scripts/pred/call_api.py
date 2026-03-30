@@ -396,6 +396,13 @@ def main():
 
     # Merge per-rank files into the final prediction file
     if use_multi_gpu:
+        # Release PyTorch's CUDA caching allocator blocks back to CUDA before
+        # the NCCL barrier.  MiniKV prefill materialises O(S²) attention weights
+        # whose freed blocks stay in the caching allocator; NCCL allocates
+        # directly from CUDA and can't see them.
+        import torch
+        del llm
+        torch.cuda.empty_cache()
         accelerator.wait_for_everyone()
         if accelerator.is_main_process:
             all_preds = []
