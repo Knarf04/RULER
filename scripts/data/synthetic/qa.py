@@ -165,20 +165,34 @@ def generate_samples(num_samples: int, max_seq_length: int, save_dir: str, incre
         if num_docs > len(DOCS):
             num_docs = len(DOCS)
             break
+    num_docs = max(num_docs, 1)
     print('Number of documents:', num_docs)
-    
+
     # Generate samples
     for index in tqdm(range(num_samples)):
         used_docs = num_docs
+        min_docs = len(QAS[(index + args.pre_samples) % len(QAS)]['context'])
         while(True):
             try:
-                input_text, answer = generate_input_output(index + args.pre_samples, used_docs)
+                input_text, answer = generate_input_output(index + args.pre_samples, max(used_docs, min_docs))
                 length = len(TOKENIZER.text_to_tokens(input_text)) + tokens_to_generate
                 assert length <= max_seq_length, f"{length} exceeds max_seq_length."
                 break
             except:
                 if used_docs > incremental:
                     used_docs -= incremental
+                elif used_docs > min_docs:
+                    used_docs -= 1
+                else:
+                    # Even minimum docs exceed the limit — truncate input to fit
+                    input_text, answer = generate_input_output(index + args.pre_samples, min_docs)
+                    tokens = TOKENIZER.text_to_tokens(input_text)
+                    max_input_tokens = max_seq_length - tokens_to_generate
+                    if len(tokens) > max_input_tokens:
+                        input_text = TOKENIZER.tokens_to_text(tokens[:max_input_tokens])
+                    length = min(len(tokens), max_input_tokens) + tokens_to_generate
+                    print(f"Warning: Sample {index} truncated to fit max_seq_length={max_seq_length}")
+                    break
         
         if args.remove_newline_tab:
             input_text = ' '.join(input_text.replace('\n', ' ').replace('\t', ' ').strip().split())

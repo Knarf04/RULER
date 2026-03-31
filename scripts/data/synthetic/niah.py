@@ -226,8 +226,9 @@ def generate_samples(num_samples: int, max_seq_length: int, save_dir: str, incre
         
         num_haystack += incremental
 
+    num_haystack = max(num_haystack, 1)
     print('Num haystack:', num_haystack)
-    
+
     # Generate samples
     for index in tqdm(range(num_samples)):
         used_haystack = num_haystack
@@ -240,6 +241,18 @@ def generate_samples(num_samples: int, max_seq_length: int, save_dir: str, incre
             except:
                 if used_haystack > incremental:
                     used_haystack -= incremental
+                elif used_haystack > 1:
+                    used_haystack -= 1
+                else:
+                    # Even minimum haystack exceeds the limit — truncate input to fit
+                    input_text, answer = generate_input_output(1)
+                    tokens = TOKENIZER.text_to_tokens(input_text)
+                    max_input_tokens = max_seq_length - tokens_to_generate
+                    if len(tokens) > max_input_tokens:
+                        input_text = TOKENIZER.tokens_to_text(tokens[:max_input_tokens])
+                    length = min(len(tokens), max_input_tokens) + tokens_to_generate
+                    print(f"Warning: Sample {index} truncated to fit max_seq_length={max_seq_length}")
+                    break
         
         if args.remove_newline_tab:
             input_text = ' '.join(input_text.replace('\n', ' ').replace('\t', ' ').strip().split())
