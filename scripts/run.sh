@@ -59,6 +59,11 @@ if [ -z "${TASKS}" ]; then
     exit 1
 fi
 
+# Resolve the actual data benchmark (e.g. niah_single -> synthetic)
+# Subsets define <name>_benchmark in config_tasks.sh; fall back to BENCHMARK itself
+BENCHMARK_VAR="${BENCHMARK}_benchmark"
+DATA_BENCHMARK=${!BENCHMARK_VAR:-$BENCHMARK}
+
 
 # Start server (you may want to run in other container.)
 if [ "$MODEL_FRAMEWORK" == "vllm" ]; then
@@ -101,15 +106,15 @@ total_time=0
 for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
 
     # Modified the data generation logic here: make the generation consistent for all models
-    DATA_DIR="${ROOT_DIR}/data/${TOKENIZER}/${BENCHMARK}/${MAX_SEQ_LENGTH}"
+    DATA_DIR="${ROOT_DIR}/data/${TOKENIZER}/${DATA_BENCHMARK}/${MAX_SEQ_LENGTH}"
     PRED_DIR="${ROOT_DIR}/${DISPLAY_NAME}/${BENCHMARK}/${MAX_SEQ_LENGTH}/pred"
     mkdir -p ${DATA_DIR}
     mkdir -p ${PRED_DIR}
-    
+
     for TASK in "${TASKS[@]}"; do
         python data/prepare.py \
             --save_dir ${DATA_DIR} \
-            --benchmark ${BENCHMARK} \
+            --benchmark ${DATA_BENCHMARK} \
             --task ${TASK} \
             --tokenizer_path ${TOKENIZER_PATH} \
             --tokenizer_type ${TOKENIZER_TYPE} \
@@ -117,12 +122,12 @@ for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
             --model_template_type ${MODEL_TEMPLATE_TYPE} \
             --num_samples ${NUM_SAMPLES} \
             ${REMOVE_NEWLINE_TAB}
-        
+
         start_time=$(date +%s)
         python pred/call_api.py \
             --data_dir ${DATA_DIR} \
             --save_dir ${PRED_DIR} \
-            --benchmark ${BENCHMARK} \
+            --benchmark ${DATA_BENCHMARK} \
             --task ${TASK} \
             --server_type ${MODEL_FRAMEWORK} \
             --model_name_or_path ${MODEL_PATH} \
@@ -135,10 +140,10 @@ for MAX_SEQ_LENGTH in "${SEQ_LENGTHS[@]}"; do
         time_diff=$((end_time - start_time))
         total_time=$((total_time + time_diff))
     done
-    
+
     python eval/evaluate.py \
         --data_dir ${PRED_DIR} \
-        --benchmark ${BENCHMARK}
+        --benchmark ${DATA_BENCHMARK}
 done
 
 echo "Total time spent on call_api: $total_time seconds"
